@@ -1,0 +1,64 @@
+version: 2
+
+project_name: rulekit
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: rulekit
+    binary: rulekit
+    main: ./
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+
+archives:
+  - id: rulekit
+    builds:
+      - rulekit
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+    format: tar.gz
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+brews:
+  - name: rulekit
+    repository:
+      owner: rulekit-dev
+      name: homebrew-tap
+    homepage: https://github.com/rulekit-dev/rulekit-cli
+    description: CLI for pulling and managing RuleKit rule bundles
+    license: MIT
+    install: |
+      bin.install "rulekit"
+    test: |
+      system "#{bin}/rulekit", "--help"
+
+snapshot:
+  version_template: "{{ .Tag }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
