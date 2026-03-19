@@ -27,19 +27,19 @@ builds:
 
 archives:
   - id: rulekit
-    builds:
+    ids:
       - rulekit
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
-        format: zip
-    format: tar.gz
+        formats: [zip]
+    formats: [tar.gz]
 
 checksum:
   name_template: checksums.txt
   algorithm: sha256
 
-brews:
+homebrew_casks:
   - name: rulekit
     repository:
       owner: rulekit-dev
@@ -47,10 +47,6 @@ brews:
     homepage: https://github.com/rulekit-dev/rulekit-cli
     description: CLI for pulling and managing RuleKit rule bundles
     license: MIT
-    install: |
-      bin.install "rulekit"
-    test: |
-      system "#{bin}/rulekit", "--help"
 
 snapshot:
   version_template: "{{ .Tag }}-next"
