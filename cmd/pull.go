@@ -16,7 +16,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const lockfilePath = "rulekit.lock"
+var lockfilePath = "rulekit.lock"
 
 var (
 	pullKey     string

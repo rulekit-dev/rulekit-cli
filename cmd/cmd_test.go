@@ -50,18 +50,17 @@ func makeBundle(t *testing.T, key string, version int, tamper bool) []byte {
 	return buf.Bytes()
 }
 
-// setupTempDir changes to a fresh temp dir and restores the original on cleanup.
+// setupTempDir creates a fresh temp dir and configures lockfilePath and env vars to point at it.
 func setupTempDir(t *testing.T) string {
 	t.Helper()
+	resetFlags()
 	dir := t.TempDir()
-	orig, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	if err := os.Chdir(dir); err != nil {
-		t.Fatalf("chdir: %v", err)
-	}
-	t.Cleanup(func() { os.Chdir(orig) })
+	lockfilePath = filepath.Join(dir, "rulekit.lock")
+	t.Setenv("RULEKIT_DIR", filepath.Join(dir, ".rulekit"))
+	t.Setenv("RULEKIT_REGISTRY_URL", "")
+	t.Setenv("RULEKIT_NAMESPACE", "")
+	t.Setenv("RULEKIT_TOKEN", "")
+	t.Cleanup(func() { lockfilePath = "rulekit.lock" })
 	return dir
 }
 
@@ -101,7 +100,7 @@ func runVerifyCmd() error {
 // --- pull tests ---
 
 func TestPull_HappyPath(t *testing.T) {
-	setupTempDir(t)
+	dir := setupTempDir(t)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/zip")
@@ -125,7 +124,7 @@ func TestPull_HappyPath(t *testing.T) {
 	}
 
 	// dsl.json must be extracted
-	if _, err := os.Stat(filepath.Join(".rulekit", "pricing", "dsl.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, ".rulekit", "pricing", "dsl.json")); err != nil {
 		t.Errorf("dsl.json not found: %v", err)
 	}
 }
@@ -209,7 +208,7 @@ func TestVerify_AllMatch(t *testing.T) {
 }
 
 func TestVerify_OneMismatch(t *testing.T) {
-	setupTempDir(t)
+	dir := setupTempDir(t)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/zip")
@@ -223,7 +222,7 @@ func TestVerify_OneMismatch(t *testing.T) {
 	}
 
 	// tamper the local file
-	if err := os.WriteFile(filepath.Join(".rulekit", "pricing", "dsl.json"), []byte(`{}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, ".rulekit", "pricing", "dsl.json"), []byte(`{}`), 0o644); err != nil {
 		t.Fatalf("tamper: %v", err)
 	}
 
@@ -234,7 +233,7 @@ func TestVerify_OneMismatch(t *testing.T) {
 }
 
 func TestVerify_MissingFile(t *testing.T) {
-	setupTempDir(t)
+	dir := setupTempDir(t)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/zip")
@@ -248,7 +247,7 @@ func TestVerify_MissingFile(t *testing.T) {
 	}
 
 	// delete the local dsl.json
-	if err := os.Remove(filepath.Join(".rulekit", "pricing", "dsl.json")); err != nil {
+	if err := os.Remove(filepath.Join(dir, ".rulekit", "pricing", "dsl.json")); err != nil {
 		t.Fatalf("remove: %v", err)
 	}
 
@@ -262,7 +261,7 @@ func TestVerify_MissingFile(t *testing.T) {
 
 func readLockfile(t *testing.T) map[string]any {
 	t.Helper()
-	data, err := os.ReadFile("rulekit.lock")
+	data, err := os.ReadFile(lockfilePath)
 	if err != nil {
 		t.Fatalf("read lockfile: %v", err)
 	}
@@ -281,7 +280,7 @@ func writeLockfile(t *testing.T, registry string, rulesets map[string]any) {
 		"rulesets":  rulesets,
 	}
 	data, _ := json.MarshalIndent(lf, "", "  ")
-	if err := os.WriteFile("rulekit.lock", data, 0o644); err != nil {
+	if err := os.WriteFile(lockfilePath, data, 0o644); err != nil {
 		t.Fatalf("write lockfile: %v", err)
 	}
 }
