@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/rulekit-dev/rulekit-cli/internal/config"
 	"github.com/rulekit-dev/rulekit-cli/internal/lock"
@@ -26,7 +25,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	lf, err := lock.Read(lockfilePath)
 	if err != nil {
 		output.Error("load lockfile: %v", err)
-		os.Exit(1)
+		return exitErr(1, "load lockfile: %v", err)
 	}
 
 	cfg := config.Resolve(flagRegistry, flagNamespace, flagDir, flagToken, lf.Registry, lf.Namespace)

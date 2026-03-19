@@ -26,26 +26,26 @@ func runRemove(cmd *cobra.Command, args []string) error {
 	lf, err := lock.Read(lockfilePath)
 	if err != nil {
 		output.Error("load lockfile: %v", err)
-		os.Exit(1)
+		return exitErr(1, "load lockfile: %v", err)
 	}
 
 	if _, ok := lf.Rulesets[key]; !ok {
 		output.Error("ruleset %q not found in lockfile", key)
-		os.Exit(1)
+		return exitErr(1, "ruleset %q not found in lockfile", key)
 	}
 
 	dir := resolveDir()
 	rulesetDir := fmt.Sprintf("%s/%s", dir, key)
 	if err := os.RemoveAll(rulesetDir); err != nil {
 		output.Error("remove directory %s: %v", rulesetDir, err)
-		os.Exit(1)
+		return exitErr(1, "remove directory %s: %v", rulesetDir, err)
 	}
 
 	delete(lf.Rulesets, key)
 
 	if err := lock.Write(lockfilePath, lf); err != nil {
 		output.Error("write lockfile: %v", err)
-		os.Exit(1)
+		return exitErr(1, "write lockfile: %v", err)
 	}
 
 	output.Info("removed %s", key)

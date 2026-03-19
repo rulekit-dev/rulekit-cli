@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"errors"
-	"os"
 
 	"github.com/rulekit-dev/rulekit-cli/internal/bundle"
 	"github.com/rulekit-dev/rulekit-cli/internal/config"
@@ -35,7 +34,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	lf, err := loadOrEmptyLock("")
 	if err != nil {
 		output.Error("%v", err)
-		os.Exit(1)
+		return exitErr(1, "%v", err)
 	}
 
 	cfg := config.Resolve(flagRegistry, flagNamespace, flagDir, flagToken, lf.Registry, lf.Namespace)
@@ -50,18 +49,17 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	if err := pullOne(context.Background(), client, lf, cfg.Dir, key, ver, cfg.Namespace); err != nil {
+		output.Error("%v", err)
 		var csErr *bundle.ChecksumMismatchError
 		if errors.As(err, &csErr) {
-			output.Error("%v", err)
-			os.Exit(2)
+			return exitErr(2, "%v", err)
 		}
-		output.Error("%v", err)
-		os.Exit(1)
+		return exitErr(1, "%v", err)
 	}
 
 	if err := lock.Write(lockfilePath, lf); err != nil {
 		output.Error("write lockfile: %v", err)
-		os.Exit(1)
+		return exitErr(1, "write lockfile: %v", err)
 	}
 
 	return nil

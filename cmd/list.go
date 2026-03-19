@@ -24,7 +24,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	lf, err := lock.Read(lockfilePath)
 	if err != nil {
 		output.Error("load lockfile: %v", err)
-		os.Exit(1)
+		return exitErr(1, "load lockfile: %v", err)
 	}
 
 	if len(lf.Rulesets) == 0 {

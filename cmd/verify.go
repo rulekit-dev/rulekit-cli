@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
@@ -25,21 +24,15 @@ func runVerify(cmd *cobra.Command, args []string) error {
 	lf, err := lock.Read(lockfilePath)
 	if err != nil {
 		output.Error("load lockfile: %v", err)
-		os.Exit(1)
+		return exitErr(1, "load lockfile: %v", err)
 	}
 
 	mismatch := false
 	for key, entry := range lf.Rulesets {
-		cfg := resolveDir()
-		dslPath := fmt.Sprintf("%s/%s/dsl.json", cfg, key)
-		err := bundle.VerifyChecksum(dslPath, entry.Checksum)
-		if err != nil {
-			var csErr *bundle.ChecksumMismatchError
-			if errors.As(err, &csErr) {
-				output.Fail(fmt.Sprintf("%s: %v", key, err))
-			} else {
-				output.Fail(fmt.Sprintf("%s: %v", key, err))
-			}
+		dir := resolveDir()
+		dslPath := fmt.Sprintf("%s/%s/dsl.json", dir, key)
+		if err := bundle.VerifyChecksum(dslPath, entry.Checksum); err != nil {
+			output.Fail(fmt.Sprintf("%s: %v", key, err))
 			mismatch = true
 		} else {
 			output.Success(fmt.Sprintf("%s: ok", key))
@@ -47,7 +40,7 @@ func runVerify(cmd *cobra.Command, args []string) error {
 	}
 
 	if mismatch {
-		os.Exit(2)
+		return exitErr(2, "checksum verification failed")
 	}
 
 	output.Info("all checksums verified (%d rulesets)", len(lf.Rulesets))

@@ -39,7 +39,7 @@ func runPull(cmd *cobra.Command, args []string) error {
 	lf, err := loadOrEmptyLock("")
 	if err != nil {
 		output.Error("%v", err)
-		os.Exit(1)
+		return exitErr(1, "%v", err)
 	}
 
 	cfg := config.Resolve(flagRegistry, flagNamespace, flagDir, flagToken, lf.Registry, lf.Namespace)
@@ -57,32 +57,31 @@ func runPull(cmd *cobra.Command, args []string) error {
 		}
 		if len(keys) == 0 {
 			output.Error("no rulesets in lockfile; use 'rulekit add <key>' first")
-			os.Exit(1)
+			return exitErr(1, "no rulesets in lockfile")
 		}
 	}
 
-	exitCode := 0
+	code := 0
 	for _, key := range keys {
 		ver := resolveVersion(key, pullVersion, lf)
 		if err := pullOne(context.Background(), client, lf, cfg.Dir, key, ver, cfg.Namespace); err != nil {
+			output.Error("%v", err)
 			var csErr *bundle.ChecksumMismatchError
 			if errors.As(err, &csErr) {
-				output.Error("%v", err)
-				exitCode = 2
+				code = 2
 			} else {
-				output.Error("%v", err)
-				exitCode = 1
+				code = 1
 			}
 		}
 	}
 
 	if err := lock.Write(lockfilePath, lf); err != nil {
 		output.Error("write lockfile: %v", err)
-		os.Exit(1)
+		return exitErr(1, "write lockfile: %v", err)
 	}
 
-	if exitCode != 0 {
-		os.Exit(exitCode)
+	if code != 0 {
+		return exitErr(code, "one or more pulls failed")
 	}
 	return nil
 }
