@@ -44,6 +44,7 @@ homebrew_casks:
     repository:
       owner: rulekit-dev
       name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: https://github.com/rulekit-dev/rulekit-cli
     description: CLI for pulling and managing RuleKit rule bundles
     license: MIT
