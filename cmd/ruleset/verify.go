@@ -1,12 +1,13 @@
-package cmd
+package ruleset
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/rulekit-dev/rulekit-cli/internal/bundle"
-	"github.com/rulekit-dev/rulekit-cli/internal/lock"
-	"github.com/rulekit-dev/rulekit-cli/internal/output"
+	"github.com/rulekit-dev/rulekit-cli/internal/domain/bundle"
+	"github.com/rulekit-dev/rulekit-cli/internal/domain/lock"
+	"github.com/rulekit-dev/rulekit-cli/internal/globals"
+	"github.com/rulekit-dev/rulekit-cli/internal/ui/output"
 	"github.com/spf13/cobra"
 )
 
@@ -16,15 +17,11 @@ var verifyCmd = &cobra.Command{
 	RunE:  runVerify,
 }
 
-func init() {
-	rootCmd.AddCommand(verifyCmd)
-}
-
 func runVerify(cmd *cobra.Command, args []string) error {
-	lf, err := lock.Read(lockfilePath)
+	lf, err := lock.Read(globals.LockfilePath)
 	if err != nil {
 		output.Error("load lockfile: %v", err)
-		return exitErr(1, "load lockfile: %v", err)
+		return globals.Exitf(1, "load lockfile: %v", err)
 	}
 
 	mismatch := false
@@ -40,7 +37,7 @@ func runVerify(cmd *cobra.Command, args []string) error {
 	}
 
 	if mismatch {
-		return exitErr(2, "checksum verification failed")
+		return globals.Exitf(2, "checksum verification failed")
 	}
 
 	output.Info("all checksums verified (%d rulesets)", len(lf.Rulesets))
@@ -48,8 +45,8 @@ func runVerify(cmd *cobra.Command, args []string) error {
 }
 
 func resolveDir() string {
-	if flagDir != "" {
-		return flagDir
+	if globals.Dir != "" {
+		return globals.Dir
 	}
 	if v := os.Getenv("RULEKIT_DIR"); v != "" {
 		return v

@@ -1,4 +1,4 @@
-package cmd
+package ruleset
 
 import (
 	"archive/zip"
@@ -11,9 +11,10 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/rulekit-dev/rulekit-cli/internal/globals"
 )
 
-// makeBundle builds a valid .zip bundle with a correct or wrong checksum.
 func makeBundle(t *testing.T, key string, version int, tamper bool) []byte {
 	t.Helper()
 
@@ -50,37 +51,33 @@ func makeBundle(t *testing.T, key string, version int, tamper bool) []byte {
 	return buf.Bytes()
 }
 
-// setupTempDir creates a fresh temp dir and configures lockfilePath and env vars to point at it.
 func setupTempDir(t *testing.T) string {
 	t.Helper()
 	resetFlags()
 	dir := t.TempDir()
-	lockfilePath = filepath.Join(dir, "rulekit.lock")
+	globals.LockfilePath = filepath.Join(dir, "rulekit.lock")
 	t.Setenv("RULEKIT_DIR", filepath.Join(dir, ".rulekit"))
 	t.Setenv("RULEKIT_REGISTRY_URL", "")
 	t.Setenv("RULEKIT_NAMESPACE", "")
 	t.Setenv("RULEKIT_TOKEN", "")
-	t.Cleanup(func() { lockfilePath = "rulekit.lock" })
+	t.Cleanup(func() { globals.LockfilePath = "rulekit.lock" })
 	return dir
 }
 
-// resetFlags resets cobra command flags and package-level flag vars to defaults.
 func resetFlags() {
-	flagRegistry = ""
-	flagNamespace = ""
-	flagDir = ""
-	flagToken = ""
-	flagVerbose = false
+	globals.Registry = ""
+	globals.Namespace = ""
+	globals.Dir = ""
+	globals.Token = ""
+	globals.Verbose = false
 	pullKey = ""
 	pullVersion = ""
 	addVersion = "latest"
 }
 
-// runCmd executes a cobra command string and returns the exit-like error.
-// Because commands call os.Exit, we invoke the RunE functions directly.
 func runAddCmd(key, registry, version string) error {
 	resetFlags()
-	flagRegistry = registry
+	globals.Registry = registry
 	addVersion = version
 	return runAdd(addCmd, []string{key})
 }
@@ -113,7 +110,6 @@ func TestPull_HappyPath(t *testing.T) {
 		t.Fatalf("add: %v", err)
 	}
 
-	// lockfile must exist with correct entry
 	lf := readLockfile(t)
 	entry, ok := lf["rulesets"].(map[string]any)["pricing"]
 	if !ok {
@@ -123,7 +119,6 @@ func TestPull_HappyPath(t *testing.T) {
 		t.Errorf("version: got %d, want 2", v)
 	}
 
-	// dsl.json must be extracted
 	if _, err := os.Stat(filepath.Join(dir, ".rulekit", "pricing", "dsl.json")); err != nil {
 		t.Errorf("dsl.json not found: %v", err)
 	}
@@ -135,7 +130,7 @@ func TestPull_ChecksumMismatch(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/zip")
 		w.WriteHeader(http.StatusOK)
-		w.Write(makeBundle(t, "pricing", 2, true)) // tampered checksum
+		w.Write(makeBundle(t, "pricing", 2, true))
 	}))
 	defer srv.Close()
 
@@ -159,8 +154,6 @@ func TestPull_AllFromLockfile(t *testing.T) {
 
 	calls := map[string]int{}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// record which key was requested
-		// path: /v1/rulesets/{key}/versions/{ver}/bundle
 		var key string
 		fmt.Sscanf(r.URL.Path, "/v1/rulesets/%s", &key)
 		calls[r.URL.Path]++
@@ -170,9 +163,8 @@ func TestPull_AllFromLockfile(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	// seed lockfile with two rulesets
 	writeLockfile(t, srv.URL, map[string]any{
-		"pricing":      map[string]any{"version": 1, "checksum": "sha256:x", "pulled_at": "2025-01-01T00:00:00Z"},
+		"pricing":       map[string]any{"version": 1, "checksum": "sha256:x", "pulled_at": "2025-01-01T00:00:00Z"},
 		"fraud-scoring": map[string]any{"version": 1, "checksum": "sha256:y", "pulled_at": "2025-01-01T00:00:00Z"},
 	})
 
@@ -221,7 +213,6 @@ func TestVerify_OneMismatch(t *testing.T) {
 		t.Fatalf("add: %v", err)
 	}
 
-	// tamper the local file
 	if err := os.WriteFile(filepath.Join(dir, ".rulekit", "pricing", "dsl.json"), []byte(`{}`), 0o644); err != nil {
 		t.Fatalf("tamper: %v", err)
 	}
@@ -246,7 +237,6 @@ func TestVerify_MissingFile(t *testing.T) {
 		t.Fatalf("add: %v", err)
 	}
 
-	// delete the local dsl.json
 	if err := os.Remove(filepath.Join(dir, ".rulekit", "pricing", "dsl.json")); err != nil {
 		t.Fatalf("remove: %v", err)
 	}
@@ -261,7 +251,7 @@ func TestVerify_MissingFile(t *testing.T) {
 
 func readLockfile(t *testing.T) map[string]any {
 	t.Helper()
-	data, err := os.ReadFile(lockfilePath)
+	data, err := os.ReadFile(globals.LockfilePath)
 	if err != nil {
 		t.Fatalf("read lockfile: %v", err)
 	}
@@ -280,7 +270,7 @@ func writeLockfile(t *testing.T, registry string, rulesets map[string]any) {
 		"rulesets":  rulesets,
 	}
 	data, _ := json.MarshalIndent(lf, "", "  ")
-	if err := os.WriteFile(lockfilePath, data, 0o644); err != nil {
+	if err := os.WriteFile(globals.LockfilePath, data, 0o644); err != nil {
 		t.Fatalf("write lockfile: %v", err)
 	}
 }

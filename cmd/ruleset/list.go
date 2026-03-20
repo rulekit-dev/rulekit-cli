@@ -1,12 +1,13 @@
-package cmd
+package ruleset
 
 import (
 	"fmt"
 	"os"
 	"text/tabwriter"
 
-	"github.com/rulekit-dev/rulekit-cli/internal/lock"
-	"github.com/rulekit-dev/rulekit-cli/internal/output"
+	"github.com/rulekit-dev/rulekit-cli/internal/domain/lock"
+	"github.com/rulekit-dev/rulekit-cli/internal/globals"
+	"github.com/rulekit-dev/rulekit-cli/internal/ui/output"
 	"github.com/spf13/cobra"
 )
 
@@ -16,15 +17,11 @@ var listCmd = &cobra.Command{
 	RunE:  runList,
 }
 
-func init() {
-	rootCmd.AddCommand(listCmd)
-}
-
 func runList(cmd *cobra.Command, args []string) error {
-	lf, err := lock.Read(lockfilePath)
+	lf, err := lock.Read(globals.LockfilePath)
 	if err != nil {
 		output.Error("load lockfile: %v", err)
-		return exitErr(1, "load lockfile: %v", err)
+		return globals.Exitf(1, "load lockfile: %v", err)
 	}
 
 	if len(lf.Rulesets) == 0 {

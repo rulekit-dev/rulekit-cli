@@ -17,6 +17,7 @@ type RulesetLock struct {
 type LockFile struct {
 	mu        sync.RWMutex
 	Registry  string                 `json:"registry"`
+	Dashboard string                 `json:"dashboard,omitempty"`
 	Namespace string                 `json:"namespace"`
 	Rulesets  map[string]RulesetLock `json:"rulesets"`
 }

@@ -1,4 +1,4 @@
-package cmd
+package ruleset
 
 import (
 	"context"
@@ -8,15 +8,14 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/rulekit-dev/rulekit-cli/internal/bundle"
-	"github.com/rulekit-dev/rulekit-cli/internal/config"
-	"github.com/rulekit-dev/rulekit-cli/internal/lock"
-	"github.com/rulekit-dev/rulekit-cli/internal/output"
-	"github.com/rulekit-dev/rulekit-cli/internal/registry"
+	"github.com/rulekit-dev/rulekit-cli/internal/app/config"
+	"github.com/rulekit-dev/rulekit-cli/internal/domain/bundle"
+	"github.com/rulekit-dev/rulekit-cli/internal/domain/lock"
+	"github.com/rulekit-dev/rulekit-cli/internal/globals"
+	"github.com/rulekit-dev/rulekit-cli/internal/infra/registry"
+	"github.com/rulekit-dev/rulekit-cli/internal/ui/output"
 	"github.com/spf13/cobra"
 )
-
-var lockfilePath = "rulekit.lock"
 
 var (
 	pullKey     string
@@ -32,17 +31,16 @@ var pullCmd = &cobra.Command{
 func init() {
 	pullCmd.Flags().StringVar(&pullKey, "key", "", "Ruleset key to pull")
 	pullCmd.Flags().StringVar(&pullVersion, "version", "", "Version to pull (number or \"latest\")")
-	rootCmd.AddCommand(pullCmd)
 }
 
 func runPull(cmd *cobra.Command, args []string) error {
 	lf, err := loadOrEmptyLock("")
 	if err != nil {
 		output.Error("%v", err)
-		return exitErr(1, "%v", err)
+		return globals.Exitf(1, "%v", err)
 	}
 
-	cfg := config.Resolve(flagRegistry, flagNamespace, flagDir, flagToken, lf.Registry, lf.Namespace)
+	cfg := config.Resolve(globals.Registry, globals.Namespace, globals.Dir, globals.Token, lf.Registry, lf.Namespace)
 	lf.Registry = cfg.RegistryURL
 	lf.Namespace = cfg.Namespace
 
@@ -57,7 +55,7 @@ func runPull(cmd *cobra.Command, args []string) error {
 		}
 		if len(keys) == 0 {
 			output.Error("no rulesets in lockfile; use 'rulekit add <key>' first")
-			return exitErr(1, "no rulesets in lockfile")
+			return globals.Exitf(1, "no rulesets in lockfile")
 		}
 	}
 
@@ -75,13 +73,13 @@ func runPull(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	if err := lock.Write(lockfilePath, lf); err != nil {
+	if err := lock.Write(globals.LockfilePath, lf); err != nil {
 		output.Error("write lockfile: %v", err)
-		return exitErr(1, "write lockfile: %v", err)
+		return globals.Exitf(1, "write lockfile: %v", err)
 	}
 
 	if code != 0 {
-		return exitErr(code, "one or more pulls failed")
+		return globals.Exitf(code, "one or more pulls failed")
 	}
 	return nil
 }
@@ -126,7 +124,7 @@ func pullOne(ctx context.Context, client *registry.Client, lf *lock.LockFile, di
 }
 
 func loadOrEmptyLock(registryURL string) (*lock.LockFile, error) {
-	lf, err := lock.Read(lockfilePath)
+	lf, err := lock.Read(globals.LockfilePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return lock.Empty(registryURL, "default"), nil

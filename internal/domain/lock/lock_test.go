@@ -1,6 +1,7 @@
 package lock
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -86,5 +87,78 @@ func TestEmpty(t *testing.T) {
 	}
 	if lf.Rulesets == nil {
 		t.Error("rulesets map should not be nil")
+	}
+}
+
+func TestDashboardField_Roundtrip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "rulekit.lock")
+
+	original := &LockFile{
+		Registry:  "http://localhost:8080",
+		Dashboard: "http://localhost:3000",
+		Namespace: "default",
+		Rulesets:  make(map[string]RulesetLock),
+	}
+
+	if err := Write(path, original); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	got, err := Read(path)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+
+	if got.Dashboard != original.Dashboard {
+		t.Errorf("dashboard: got %q, want %q", got.Dashboard, original.Dashboard)
+	}
+}
+
+func TestDashboardField_BackwardCompat(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "rulekit.lock")
+
+	// Write a lock file without the dashboard field (simulating old format).
+	old := `{"registry":"http://localhost:8080","namespace":"default","rulesets":{}}`
+	if err := os.WriteFile(path, []byte(old), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	got, err := Read(path)
+	if err != nil {
+		t.Fatalf("read old format: %v", err)
+	}
+
+	if got.Dashboard != "" {
+		t.Errorf("dashboard should be empty for old format, got %q", got.Dashboard)
+	}
+	if got.Registry != "http://localhost:8080" {
+		t.Errorf("registry: got %q", got.Registry)
+	}
+}
+
+func TestDashboardField_OmitemptyInJSON(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "rulekit.lock")
+
+	lf := &LockFile{
+		Registry:  "http://localhost:8080",
+		Dashboard: "", // empty — should be omitted
+		Namespace: "default",
+		Rulesets:  make(map[string]RulesetLock),
+	}
+
+	if err := Write(path, lf); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read file: %v", err)
+	}
+
+	if bytes.Contains(data, []byte(`"dashboard"`)) {
+		t.Error("dashboard key should be omitted when empty")
 	}
 }

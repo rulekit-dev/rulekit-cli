@@ -1,14 +1,15 @@
-package cmd
+package ruleset
 
 import (
 	"context"
 	"errors"
 
-	"github.com/rulekit-dev/rulekit-cli/internal/bundle"
-	"github.com/rulekit-dev/rulekit-cli/internal/config"
-	"github.com/rulekit-dev/rulekit-cli/internal/lock"
-	"github.com/rulekit-dev/rulekit-cli/internal/output"
-	"github.com/rulekit-dev/rulekit-cli/internal/registry"
+	"github.com/rulekit-dev/rulekit-cli/internal/app/config"
+	"github.com/rulekit-dev/rulekit-cli/internal/domain/bundle"
+	"github.com/rulekit-dev/rulekit-cli/internal/domain/lock"
+	"github.com/rulekit-dev/rulekit-cli/internal/globals"
+	"github.com/rulekit-dev/rulekit-cli/internal/infra/registry"
+	"github.com/rulekit-dev/rulekit-cli/internal/ui/output"
 	"github.com/spf13/cobra"
 )
 
@@ -25,7 +26,6 @@ var addCmd = &cobra.Command{
 
 func init() {
 	addCmd.Flags().StringVar(&addVersion, "version", "latest", "Version to pull (number or \"latest\")")
-	rootCmd.AddCommand(addCmd)
 }
 
 func runAdd(cmd *cobra.Command, args []string) error {
@@ -34,10 +34,10 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	lf, err := loadOrEmptyLock("")
 	if err != nil {
 		output.Error("%v", err)
-		return exitErr(1, "%v", err)
+		return globals.Exitf(1, "%v", err)
 	}
 
-	cfg := config.Resolve(flagRegistry, flagNamespace, flagDir, flagToken, lf.Registry, lf.Namespace)
+	cfg := config.Resolve(globals.Registry, globals.Namespace, globals.Dir, globals.Token, lf.Registry, lf.Namespace)
 	lf.Registry = cfg.RegistryURL
 	lf.Namespace = cfg.Namespace
 
@@ -52,14 +52,14 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		output.Error("%v", err)
 		var csErr *bundle.ChecksumMismatchError
 		if errors.As(err, &csErr) {
-			return exitErr(2, "%v", err)
+			return globals.Exitf(2, "%v", err)
 		}
-		return exitErr(1, "%v", err)
+		return globals.Exitf(1, "%v", err)
 	}
 
-	if err := lock.Write(lockfilePath, lf); err != nil {
+	if err := lock.Write(globals.LockfilePath, lf); err != nil {
 		output.Error("write lockfile: %v", err)
-		return exitErr(1, "write lockfile: %v", err)
+		return globals.Exitf(1, "write lockfile: %v", err)
 	}
 
 	return nil

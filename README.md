@@ -65,9 +65,91 @@ rulekit verify
 
 ---
 
-## Commands
+## Stack management
+
+### Setup wizard
+
+The first time you run `rulekit up`, a setup wizard guides you through configuring the stack:
+
+```sh
+rulekit up
+```
+
+To reconfigure an existing setup:
+
+```sh
+rulekit up --reconfigure
+```
+
+For CI or scripted environments (accept all defaults):
+
+```sh
+rulekit up --yes
+```
+
+The wizard configures:
+- Database (SQLite or Postgres)
+- Blob storage (filesystem or S3 / R2 / MinIO)
+- Authentication (none, API key, or JWT)
+- Ports
+
+Config is saved to `~/.rulekit/compose/.env`. Secrets are stored with `0600` permissions (owner-only).
+
+---
+
+Start the full RuleKit stack (registry + dashboard) with one command:
+
+```sh
+rulekit up
+```
+
+With Postgres:
+
+```sh
+rulekit up --postgres
+```
+
+Check health:
+
+```sh
+rulekit status
+```
+
+Open the visual editor:
+
+```sh
+rulekit dashboard
+```
+
+Stop:
+
+```sh
+rulekit down
+```
+
+Upgrade to latest:
+
+```sh
+rulekit upgrade
+```
+
+| Command | Flags | Description |
+|---------|-------|-------------|
+| `rulekit up` | `--postgres`, `--port`, `--dashboard-port`, `--registry-image`, `--dashboard-image` | Start registry + dashboard via Docker |
+| `rulekit down` | — | Stop all containers |
+| `rulekit restart` | — | Stop + start, preserving existing config |
+| `rulekit status` | — | Infra health check (registry, dashboard, db) + ruleset update status |
+| `rulekit dashboard` | — | Open dashboard in default browser |
+| `rulekit logs` | `--service`, `--follow` | Tail container logs |
+| `rulekit upgrade` | — | Pull latest images + rolling restart |
+| `rulekit uninstall` | — | Stop containers + remove `~/.rulekit/compose/` |
+
+---
+
+## Ruleset management
 
 ### `rulekit pull`
+
 
 Pull rule bundles from the registry.
 

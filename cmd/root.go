@@ -2,38 +2,20 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 
+	"github.com/rulekit-dev/rulekit-cli/cmd/ruleset"
+	"github.com/rulekit-dev/rulekit-cli/cmd/stack"
+	"github.com/rulekit-dev/rulekit-cli/internal/globals"
 	"github.com/spf13/cobra"
 )
-
-var (
-	flagRegistry  string
-	flagNamespace string
-	flagDir       string
-	flagToken     string
-	flagVerbose   bool
-)
-
-// ExitError is returned by commands that need a specific exit code.
-type ExitError struct {
-	Code int
-	Msg  string
-}
-
-func (e *ExitError) Error() string { return e.Msg }
-
-func exitErr(code int, format string, args ...any) error {
-	return &ExitError{Code: code, Msg: fmt.Sprintf(format, args...)}
-}
 
 var rootCmd = &cobra.Command{
 	Use:   "rulekit",
 	Short: "rulekit-cli pulls and manages rule bundles from the rulekit-registry",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if flagVerbose {
+		if globals.Verbose {
 			slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 				Level: slog.LevelDebug,
 			})))
@@ -44,7 +26,7 @@ var rootCmd = &cobra.Command{
 
 func Execute() int {
 	if err := rootCmd.Execute(); err != nil {
-		var exitErr *ExitError
+		var exitErr *globals.ExitError
 		if errors.As(err, &exitErr) {
 			return exitErr.Code
 		}
@@ -54,9 +36,12 @@ func Execute() int {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&flagRegistry, "registry", "", "Registry base URL")
-	rootCmd.PersistentFlags().StringVar(&flagNamespace, "namespace", "", "Namespace (default: \"default\")")
-	rootCmd.PersistentFlags().StringVar(&flagDir, "dir", "", "Local output directory (default: .rulekit)")
-	rootCmd.PersistentFlags().StringVar(&flagToken, "token", "", "Bearer token")
-	rootCmd.PersistentFlags().BoolVar(&flagVerbose, "verbose", false, "Enable structured logging")
+	rootCmd.PersistentFlags().StringVar(&globals.Registry, "registry", "", "Registry base URL")
+	rootCmd.PersistentFlags().StringVar(&globals.Namespace, "namespace", "", "Namespace (default: \"default\")")
+	rootCmd.PersistentFlags().StringVar(&globals.Dir, "dir", "", "Local output directory (default: .rulekit)")
+	rootCmd.PersistentFlags().StringVar(&globals.Token, "token", "", "Bearer token")
+	rootCmd.PersistentFlags().BoolVar(&globals.Verbose, "verbose", false, "Enable structured logging")
+
+	stack.Register(rootCmd)
+	ruleset.Register(rootCmd)
 }
