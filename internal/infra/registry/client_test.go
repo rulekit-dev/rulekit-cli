@@ -18,7 +18,7 @@ func makeValidBundle(t *testing.T) []byte {
 	w := zip.NewWriter(&buf)
 
 	manifest := map[string]any{
-		"namespace":   "default",
+		"workspace":   "default",
 		"ruleset_key": "payout-routing",
 		"version":     4,
 		"checksum":    "sha256:a3f1c8deadbeef",
@@ -51,8 +51,8 @@ func TestDownloadBundle_HappyPath(t *testing.T) {
 		if r.URL.Path != "/v1/rulesets/payout-routing/versions/latest/bundle" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
-		if r.URL.Query().Get("namespace") != "default" {
-			t.Errorf("unexpected namespace: %s", r.URL.Query().Get("namespace"))
+		if r.URL.Query().Get("workspace") != "default" {
+			t.Errorf("unexpected workspace: %s", r.URL.Query().Get("workspace"))
 		}
 		w.Header().Set("Content-Type", "application/zip")
 		w.WriteHeader(http.StatusOK)
@@ -120,7 +120,7 @@ func TestDownloadBundle_Unreachable(t *testing.T) {
 
 func TestGetLatestVersion_HappyPath(t *testing.T) {
 	meta := VersionMeta{
-		Namespace:  "default",
+		Workspace:  "default",
 		RulesetKey: "payout-routing",
 		Version:    7,
 		Checksum:   "sha256:cafebabe",

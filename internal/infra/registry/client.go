@@ -16,7 +16,7 @@ type Client struct {
 }
 
 type VersionMeta struct {
-	Namespace  string    `json:"namespace"`
+	Workspace  string    `json:"workspace"`
 	RulesetKey string    `json:"ruleset_key"`
 	Version    int       `json:"version"`
 	Checksum   string    `json:"checksum"`
@@ -51,8 +51,8 @@ func (c *Client) newRequest(ctx context.Context, method, url string) (*http.Requ
 	return req, nil
 }
 
-func (c *Client) DownloadBundle(ctx context.Context, key, version, namespace string) ([]byte, error) {
-	url := fmt.Sprintf("%s/v1/rulesets/%s/versions/%s/bundle?namespace=%s", c.BaseURL, key, version, namespace)
+func (c *Client) DownloadBundle(ctx context.Context, key, version, workspace string) ([]byte, error) {
+	url := fmt.Sprintf("%s/v1/rulesets/%s/versions/%s/bundle?workspace=%s", c.BaseURL, key, version, workspace)
 
 	req, err := c.newRequest(ctx, http.MethodGet, url)
 	if err != nil {
@@ -77,8 +77,8 @@ func (c *Client) DownloadBundle(ctx context.Context, key, version, namespace str
 	return body, nil
 }
 
-func (c *Client) GetLatestVersion(ctx context.Context, key, namespace string) (*VersionMeta, error) {
-	url := fmt.Sprintf("%s/v1/rulesets/%s/versions/latest?namespace=%s", c.BaseURL, key, namespace)
+func (c *Client) GetLatestVersion(ctx context.Context, key, workspace string) (*VersionMeta, error) {
+	url := fmt.Sprintf("%s/v1/rulesets/%s/versions/latest?workspace=%s", c.BaseURL, key, workspace)
 
 	req, err := c.newRequest(ctx, http.MethodGet, url)
 	if err != nil {

@@ -25,11 +25,11 @@ func runDiff(cmd *cobra.Command, args []string) error {
 		return globals.Exitf(1, "load lockfile: %v", err)
 	}
 
-	cfg := config.Resolve(globals.Registry, globals.Namespace, globals.Dir, globals.Token, lf.Registry, lf.Namespace)
+	cfg := config.Resolve(globals.Registry, globals.Workspace, globals.Dir, globals.Token, lf.Registry, lf.Workspace)
 	client := registry.NewClient(cfg.RegistryURL, cfg.Token)
 
 	for key, entry := range lf.Rulesets {
-		meta, err := client.GetLatestVersion(context.Background(), key, cfg.Namespace)
+		meta, err := client.GetLatestVersion(context.Background(), key, cfg.Workspace)
 		if err != nil {
 			output.Fail(fmt.Sprintf("%s: unverified (error: %v)", key, err))
 			continue

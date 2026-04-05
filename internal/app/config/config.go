@@ -4,7 +4,7 @@ import "os"
 
 type Config struct {
 	RegistryURL string
-	Namespace   string
+	Workspace   string
 	Dir         string
 	Token       string
 	Verbose     bool
@@ -12,25 +12,25 @@ type Config struct {
 
 // Resolve builds a Config by layering sources in priority order:
 // defaults → lockfile values → environment variables → CLI flags.
-func Resolve(flagRegistry, flagNamespace, flagDir, flagToken string, lockRegistry, lockNamespace string) Config {
+func Resolve(flagRegistry, flagWorkspace, flagDir, flagToken string, lockRegistry, lockWorkspace string) Config {
 	cfg := Config{
 		RegistryURL: "http://localhost:8080",
-		Namespace:   "default",
+		Workspace:   "default",
 		Dir:         ".rulekit",
 	}
 
 	if lockRegistry != "" {
 		cfg.RegistryURL = lockRegistry
 	}
-	if lockNamespace != "" {
-		cfg.Namespace = lockNamespace
+	if lockWorkspace != "" {
+		cfg.Workspace = lockWorkspace
 	}
 
 	if v := os.Getenv("RULEKIT_REGISTRY_URL"); v != "" {
 		cfg.RegistryURL = v
 	}
-	if v := os.Getenv("RULEKIT_NAMESPACE"); v != "" {
-		cfg.Namespace = v
+	if v := os.Getenv("RULEKIT_WORKSPACE"); v != "" {
+		cfg.Workspace = v
 	}
 	if v := os.Getenv("RULEKIT_DIR"); v != "" {
 		cfg.Dir = v
@@ -42,8 +42,8 @@ func Resolve(flagRegistry, flagNamespace, flagDir, flagToken string, lockRegistr
 	if flagRegistry != "" {
 		cfg.RegistryURL = flagRegistry
 	}
-	if flagNamespace != "" {
-		cfg.Namespace = flagNamespace
+	if flagWorkspace != "" {
+		cfg.Workspace = flagWorkspace
 	}
 	if flagDir != "" {
 		cfg.Dir = flagDir

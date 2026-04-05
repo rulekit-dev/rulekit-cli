@@ -5,7 +5,7 @@ package globals
 // cmd/ruleset read them directly.
 var (
 	Registry  string
-	Namespace string
+	Workspace string
 	Dir       string
 	Token     string
 	Verbose   bool

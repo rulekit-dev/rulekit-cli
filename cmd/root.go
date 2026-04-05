@@ -37,7 +37,7 @@ func Execute() int {
 
 func init() {
 	rootCmd.PersistentFlags().StringVar(&globals.Registry, "registry", "", "Registry base URL")
-	rootCmd.PersistentFlags().StringVar(&globals.Namespace, "namespace", "", "Namespace (default: \"default\")")
+	rootCmd.PersistentFlags().StringVar(&globals.Workspace, "workspace", "", "Workspace (default: \"default\")")
 	rootCmd.PersistentFlags().StringVar(&globals.Dir, "dir", "", "Local output directory (default: .rulekit)")
 	rootCmd.PersistentFlags().StringVar(&globals.Token, "token", "", "Bearer token")
 	rootCmd.PersistentFlags().BoolVar(&globals.Verbose, "verbose", false, "Enable structured logging")

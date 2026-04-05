@@ -16,7 +16,7 @@ func TestRoundtrip(t *testing.T) {
 
 	original := &LockFile{
 		Registry:  "http://registry.example.com",
-		Namespace: "production",
+		Workspace: "production",
 		Rulesets: map[string]RulesetLock{
 			"payout-routing": {
 				Version:  4,
@@ -43,8 +43,8 @@ func TestRoundtrip(t *testing.T) {
 	if got.Registry != original.Registry {
 		t.Errorf("registry: got %q, want %q", got.Registry, original.Registry)
 	}
-	if got.Namespace != original.Namespace {
-		t.Errorf("namespace: got %q, want %q", got.Namespace, original.Namespace)
+	if got.Workspace != original.Workspace {
+		t.Errorf("workspace: got %q, want %q", got.Workspace, original.Workspace)
 	}
 	if len(got.Rulesets) != len(original.Rulesets) {
 		t.Errorf("rulesets count: got %d, want %d", len(got.Rulesets), len(original.Rulesets))
@@ -97,7 +97,7 @@ func TestDashboardField_Roundtrip(t *testing.T) {
 	original := &LockFile{
 		Registry:  "http://localhost:8080",
 		Dashboard: "http://localhost:3000",
-		Namespace: "default",
+		Workspace: "default",
 		Rulesets:  make(map[string]RulesetLock),
 	}
 
@@ -120,7 +120,7 @@ func TestDashboardField_BackwardCompat(t *testing.T) {
 	path := filepath.Join(dir, "rulekit.lock")
 
 	// Write a lock file without the dashboard field (simulating old format).
-	old := `{"registry":"http://localhost:8080","namespace":"default","rulesets":{}}`
+	old := `{"registry":"http://localhost:8080","workspace":"default","rulesets":{}}`
 	if err := os.WriteFile(path, []byte(old), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestDashboardField_OmitemptyInJSON(t *testing.T) {
 	lf := &LockFile{
 		Registry:  "http://localhost:8080",
 		Dashboard: "", // empty — should be omitted
-		Namespace: "default",
+		Workspace: "default",
 		Rulesets:  make(map[string]RulesetLock),
 	}
 

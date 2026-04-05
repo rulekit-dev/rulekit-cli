@@ -18,7 +18,7 @@ type LockFile struct {
 	mu        sync.RWMutex
 	Registry  string                 `json:"registry"`
 	Dashboard string                 `json:"dashboard,omitempty"`
-	Namespace string                 `json:"namespace"`
+	Workspace string                 `json:"workspace"`
 	Rulesets  map[string]RulesetLock `json:"rulesets"`
 }
 
@@ -56,10 +56,10 @@ func Write(path string, lf *LockFile) error {
 	return nil
 }
 
-func Empty(registry, namespace string) *LockFile {
+func Empty(registry, workspace string) *LockFile {
 	return &LockFile{
 		Registry:  registry,
-		Namespace: namespace,
+		Workspace: workspace,
 		Rulesets:  make(map[string]RulesetLock),
 	}
 }

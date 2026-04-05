@@ -40,9 +40,9 @@ func runPull(cmd *cobra.Command, args []string) error {
 		return globals.Exitf(1, "%v", err)
 	}
 
-	cfg := config.Resolve(globals.Registry, globals.Namespace, globals.Dir, globals.Token, lf.Registry, lf.Namespace)
+	cfg := config.Resolve(globals.Registry, globals.Workspace, globals.Dir, globals.Token, lf.Registry, lf.Workspace)
 	lf.Registry = cfg.RegistryURL
-	lf.Namespace = cfg.Namespace
+	lf.Workspace = cfg.Workspace
 
 	client := registry.NewClient(cfg.RegistryURL, cfg.Token)
 
@@ -62,7 +62,7 @@ func runPull(cmd *cobra.Command, args []string) error {
 	code := 0
 	for _, key := range keys {
 		ver := resolveVersion(key, pullVersion, lf)
-		if err := pullOne(context.Background(), client, lf, cfg.Dir, key, ver, cfg.Namespace); err != nil {
+		if err := pullOne(context.Background(), client, lf, cfg.Dir, key, ver, cfg.Workspace); err != nil {
 			output.Error("%v", err)
 			var csErr *bundle.ChecksumMismatchError
 			if errors.As(err, &csErr) {
@@ -94,10 +94,10 @@ func resolveVersion(key, flagVer string, lf *lock.LockFile) string {
 	return "latest"
 }
 
-func pullOne(ctx context.Context, client *registry.Client, lf *lock.LockFile, dir, key, version, namespace string) error {
+func pullOne(ctx context.Context, client *registry.Client, lf *lock.LockFile, dir, key, version, workspace string) error {
 	output.Info("pulling %s@%s…", key, version)
 
-	zipBytes, err := client.DownloadBundle(ctx, key, version, namespace)
+	zipBytes, err := client.DownloadBundle(ctx, key, version, workspace)
 	if err != nil {
 		return fmt.Errorf("download %s: %w", key, err)
 	}
@@ -127,7 +127,7 @@ func loadOrEmptyLock(registryURL string) (*lock.LockFile, error) {
 	lf, err := lock.Read(globals.LockfilePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return lock.Empty(registryURL, "default"), nil
+			return lock.Empty(registryURL, ""), nil
 		}
 		return nil, err
 	}

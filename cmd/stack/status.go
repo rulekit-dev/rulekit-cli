@@ -84,12 +84,12 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		output.Info("checking rulesets…")
 		fmt.Println()
 
-		cfg := config.Resolve(globals.Registry, globals.Namespace, globals.Dir, globals.Token, lf.Registry, lf.Namespace)
+		cfg := config.Resolve(globals.Registry, globals.Workspace, globals.Dir, globals.Token, lf.Registry, lf.Workspace)
 		regClient := registry.NewClient(cfg.RegistryURL, cfg.Token)
 
 		w2 := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
 		for key, entry := range lf.Rulesets {
-			meta, err := regClient.GetLatestVersion(context.Background(), key, cfg.Namespace)
+			meta, err := regClient.GetLatestVersion(context.Background(), key, cfg.Workspace)
 			if err != nil {
 				fmt.Fprintf(w2, "%s\t%s not found in registry\n", key, output.SymFail())
 				continue

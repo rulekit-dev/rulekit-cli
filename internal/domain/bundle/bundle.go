@@ -14,7 +14,7 @@ import (
 )
 
 type Manifest struct {
-	Namespace  string    `json:"namespace"`
+	Workspace  string    `json:"workspace"`
 	RulesetKey string    `json:"ruleset_key"`
 	Version    int       `json:"version"`
 	Checksum   string    `json:"checksum"`

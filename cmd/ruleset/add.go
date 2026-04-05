@@ -37,9 +37,9 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return globals.Exitf(1, "%v", err)
 	}
 
-	cfg := config.Resolve(globals.Registry, globals.Namespace, globals.Dir, globals.Token, lf.Registry, lf.Namespace)
+	cfg := config.Resolve(globals.Registry, globals.Workspace, globals.Dir, globals.Token, lf.Registry, lf.Workspace)
 	lf.Registry = cfg.RegistryURL
-	lf.Namespace = cfg.Namespace
+	lf.Workspace = cfg.Workspace
 
 	client := registry.NewClient(cfg.RegistryURL, cfg.Token)
 
@@ -48,7 +48,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		ver = "latest"
 	}
 
-	if err := pullOne(context.Background(), client, lf, cfg.Dir, key, ver, cfg.Namespace); err != nil {
+	if err := pullOne(context.Background(), client, lf, cfg.Dir, key, ver, cfg.Workspace); err != nil {
 		output.Error("%v", err)
 		var csErr *bundle.ChecksumMismatchError
 		if errors.As(err, &csErr) {

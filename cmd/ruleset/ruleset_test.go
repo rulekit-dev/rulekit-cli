@@ -26,7 +26,7 @@ func makeBundle(t *testing.T, key string, version int, tamper bool) []byte {
 	}
 
 	manifest := map[string]any{
-		"namespace":   "default",
+		"workspace":   "default",
 		"ruleset_key": key,
 		"version":     version,
 		"checksum":    checksum,
@@ -58,7 +58,7 @@ func setupTempDir(t *testing.T) string {
 	globals.LockfilePath = filepath.Join(dir, "rulekit.lock")
 	t.Setenv("RULEKIT_DIR", filepath.Join(dir, ".rulekit"))
 	t.Setenv("RULEKIT_REGISTRY_URL", "")
-	t.Setenv("RULEKIT_NAMESPACE", "")
+	t.Setenv("RULEKIT_WORKSPACE", "")
 	t.Setenv("RULEKIT_TOKEN", "")
 	t.Cleanup(func() { globals.LockfilePath = "rulekit.lock" })
 	return dir
@@ -66,7 +66,7 @@ func setupTempDir(t *testing.T) string {
 
 func resetFlags() {
 	globals.Registry = ""
-	globals.Namespace = ""
+	globals.Workspace = ""
 	globals.Dir = ""
 	globals.Token = ""
 	globals.Verbose = false
@@ -266,7 +266,7 @@ func writeLockfile(t *testing.T, registry string, rulesets map[string]any) {
 	t.Helper()
 	lf := map[string]any{
 		"registry":  registry,
-		"namespace": "default",
+		"workspace": "default",
 		"rulesets":  rulesets,
 	}
 	data, _ := json.MarshalIndent(lf, "", "  ")

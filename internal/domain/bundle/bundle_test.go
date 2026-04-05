@@ -15,7 +15,7 @@ func makeTestZip(t *testing.T, dslContent string) []byte {
 	t.Helper()
 
 	manifest := `{
-		"namespace": "default",
+		"workspace": "default",
 		"ruleset_key": "test-ruleset",
 		"version": 3,
 		"checksum": "placeholder",
@@ -54,7 +54,7 @@ func makeTestZipWithChecksum(t *testing.T) ([]byte, string) {
 	checksum := fmt.Sprintf("sha256:%x", sum)
 
 	manifest := fmt.Sprintf(`{
-		"namespace": "default",
+		"workspace": "default",
 		"ruleset_key": "test-ruleset",
 		"version": 3,
 		"checksum": %q,
@@ -101,8 +101,8 @@ func TestExtract_ReturnsManifest(t *testing.T) {
 	if manifest.Version != 3 {
 		t.Errorf("version: got %d, want 3", manifest.Version)
 	}
-	if manifest.Namespace != "default" {
-		t.Errorf("namespace: got %q, want %q", manifest.Namespace, "default")
+	if manifest.Workspace != "default" {
+		t.Errorf("workspace: got %q, want %q", manifest.Workspace, "default")
 	}
 
 	dslPath := filepath.Join(destDir, "dsl.json")
