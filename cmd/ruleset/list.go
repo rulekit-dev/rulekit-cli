@@ -12,10 +12,10 @@ import (
 )
 
 var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List all locked rulesets",
+	Use:     "list",
+	Short:   "List all locked rulesets",
 	GroupID: "ruleset",
-	RunE:  runList,
+	RunE:    runList,
 }
 
 func runList(cmd *cobra.Command, args []string) error {
@@ -30,17 +30,24 @@ func runList(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	fmt.Println()
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-	fmt.Fprintln(w, "key\tversion\tchecksum\tpulled_at")
+	fmt.Fprintf(w, "  %s\t%s\t%s\t%s\n",
+		output.Label("key"),
+		output.Label("version"),
+		output.Label("checksum"),
+		output.Label("pulled"),
+	)
 	for key, entry := range lf.Rulesets {
-		fmt.Fprintf(w, "%s\tv%d\t%s\t%s\n",
-			key,
-			entry.Version,
-			entry.Checksum,
-			entry.PulledAt.Format("2006-01-02"),
+		fmt.Fprintf(w, "  %s\t%s\t%s\t%s\n",
+			output.Highlight(key),
+			output.Muted(fmt.Sprintf("v%d", entry.Version)),
+			output.Muted(entry.Checksum[:12]+"…"),
+			output.Muted(entry.PulledAt.Format("2006-01-02")),
 		)
 	}
 	w.Flush()
+	fmt.Println()
 
 	return nil
 }

@@ -120,7 +120,10 @@ func pullOne(ctx context.Context, client *registry.Client, lf *lock.LockFile, di
 		PulledAt: time.Now().UTC(),
 	}
 
-	output.Info("locked %s v%d · %s", key, manifest.Version, manifest.Checksum)
+	output.Success(fmt.Sprintf("locked %s %s",
+		output.Highlight(key),
+		output.Muted(fmt.Sprintf("v%d · %s", manifest.Version, manifest.Checksum)),
+	))
 	return nil
 }
 

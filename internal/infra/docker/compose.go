@@ -28,7 +28,6 @@ func DefaultComposeOptions() ComposeOptions {
 
 // composeFile is the top-level docker-compose.yml structure.
 type composeFile struct {
-	Version  string                 `yaml:"version"`
 	Services map[string]service     `yaml:"services"`
 	Volumes  map[string]emptyVolume `yaml:"volumes,omitempty"`
 }
@@ -148,7 +147,6 @@ func buildCompose(opts ComposeOptions) composeFile {
 	}
 
 	return composeFile{
-		Version:  "3.9",
 		Services: services,
 		Volumes:  volumes,
 	}

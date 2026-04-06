@@ -1,228 +1,25 @@
 package wizard
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 )
+
+// ErrCancelled is returned when the user aborts the wizard.
+var ErrCancelled = fmt.Errorf("setup cancelled. nothing was saved")
 
 // RunWizard runs the interactive configuration wizard and returns the resulting StackConfig.
 // existing may be nil for a first-time setup, or non-nil to pre-fill defaults for --reconfigure.
 func RunWizard(p *Prompter, existing *StackConfig) (*StackConfig, error) {
-	defaults := Defaults()
-	if existing != nil {
-		defaults = *existing
+	if !IsTTY() {
+		return runWizardFallback(p, existing)
 	}
-
-	fmt.Fprintln(p.Out, "rulekit: first-time setup — let's configure your stack.")
-	fmt.Fprintln(p.Out, "rulekit: press enter to accept defaults shown in [brackets].")
-	fmt.Fprintln(p.Out)
-	fmt.Fprintln(p.Out, "─────────────────────────────────────────")
-
-	cfg := defaults
-
-	// Step 1 — Database
-	fmt.Fprintln(p.Out, "\nSTEP 1 — Database")
-	fmt.Fprintln(p.Out, "\n  Which database would you like to use?")
-
-	dbDefault := 0
-	if defaults.Store == "postgres" {
-		dbDefault = 1
-	}
-	dbIdx, err := p.PromptSelect("", []string{
-		"SQLite   — zero config, great for local dev and small teams (default)",
-		"Postgres — recommended for production and multi-user setups",
-	}, dbDefault)
-	if err != nil {
-		return nil, err
-	}
-
-	if dbIdx == 0 {
-		cfg.Store = "sqlite"
-		cfg.DataDir = "/data"
-		cfg.DatabaseURL = ""
-	} else {
-		cfg.Store = "postgres"
-		pgDefault := defaults.DatabaseURL
-		if pgDefault == "" {
-			pgDefault = "postgres://rulekit:rulekit@localhost:5432/rulekit"
-		}
-		pgURL, err := promptValidated(p, "Postgres connection URL", pgDefault, validatePostgresURL)
-		if err != nil {
-			return nil, err
-		}
-		cfg.DatabaseURL = pgURL
-	}
-
-	fmt.Fprintln(p.Out, "\n─────────────────────────────────────────")
-
-	// Step 2 — Blob storage
-	fmt.Fprintln(p.Out, "\nSTEP 2 — Blob storage")
-	fmt.Fprintln(p.Out, "\n  Where should rule bundles be stored?")
-
-	blobDefault := 0
-	if defaults.BlobStore == "s3" {
-		blobDefault = 1
-	}
-	blobIdx, err := p.PromptSelect("", []string{
-		"Filesystem — stored inside the container volume (default)",
-		"S3         — AWS S3 or any S3-compatible store (Cloudflare R2, MinIO)",
-	}, blobDefault)
-	if err != nil {
-		return nil, err
-	}
-
-	if blobIdx == 0 {
-		cfg.BlobStore = "fs"
-		cfg.S3Bucket = ""
-		cfg.S3Region = ""
-		cfg.S3Endpoint = ""
-		cfg.S3AccessKeyID = ""
-		cfg.S3SecretAccessKey = ""
-	} else {
-		cfg.BlobStore = "s3"
-
-		bucket, err := promptValidated(p, "Bucket name", defaults.S3Bucket, func(s string) error {
-			if s == "" {
-				return fmt.Errorf("bucket name is required")
-			}
-			return nil
-		})
-		if err != nil {
-			return nil, err
-		}
-		cfg.S3Bucket = bucket
-
-		region, err := p.PromptText("Region", orDefault(defaults.S3Region, "us-east-1"))
-		if err != nil {
-			return nil, err
-		}
-		cfg.S3Region = region
-
-		endpoint, err := p.PromptText("Endpoint (leave blank for AWS)", defaults.S3Endpoint)
-		if err != nil {
-			return nil, err
-		}
-		cfg.S3Endpoint = endpoint
-
-		accessKey, err := promptValidated(p, "Access key ID", defaults.S3AccessKeyID, func(s string) error {
-			if s == "" {
-				return fmt.Errorf("access key ID is required")
-			}
-			return nil
-		})
-		if err != nil {
-			return nil, err
-		}
-		cfg.S3AccessKeyID = accessKey
-
-		secretKey, err := p.PromptSecret("Secret access key")
-		if err != nil {
-			return nil, err
-		}
-		if secretKey == "" && defaults.S3SecretAccessKey != "" {
-			secretKey = defaults.S3SecretAccessKey
-		}
-		if secretKey == "" {
-			return nil, fmt.Errorf("secret access key is required")
-		}
-		cfg.S3SecretAccessKey = secretKey
-	}
-
-	fmt.Fprintln(p.Out, "\n─────────────────────────────────────────")
-
-	// Step 3 — Authentication
-	fmt.Fprintln(p.Out, "\nSTEP 3 — Authentication")
-	fmt.Fprintln(p.Out)
-
-	adminPassword, err := p.PromptSecret("Admin password (leave blank to generate one)")
-	if err != nil {
-		return nil, err
-	}
-	if adminPassword == "" {
-		if existing != nil && defaults.AdminPassword != "" {
-			adminPassword = defaults.AdminPassword
-			fmt.Fprintln(p.Out, "  rulekit: keeping existing admin password.")
-		} else {
-			generated, err := GenerateSecret(16)
-			if err != nil {
-				return nil, err
-			}
-			adminPassword = generated
-			fmt.Fprintf(p.Out, "  rulekit: generated admin password: %s\n", adminPassword)
-			fmt.Fprintln(p.Out, "  rulekit: save this — it will not be shown again.")
-		}
-	}
-	cfg.AdminPassword = adminPassword
-
-	if existing != nil && defaults.JWTSecret != "" {
-		cfg.JWTSecret = defaults.JWTSecret
-	} else {
-		secret, err := GenerateSecret(32)
-		if err != nil {
-			return nil, err
-		}
-		cfg.JWTSecret = secret
-	}
-
-	configureSMTP, err := p.PromptConfirm("Configure SMTP? Without it, OTP codes print to registry stdout.", false)
-	if err != nil {
-		return nil, err
-	}
-	cfg.SMTPEnabled = configureSMTP
-	if configureSMTP {
-		if err := fillSMTP(p, &cfg, existing); err != nil {
-			return nil, err
-		}
-	} else {
-		cfg.SMTPHost = ""
-		cfg.SMTPUsername = ""
-		cfg.SMTPPassword = ""
-	}
-
-	fmt.Fprintln(p.Out, "\n─────────────────────────────────────────")
-
-	// Step 4 — Ports
-	fmt.Fprintln(p.Out, "\nSTEP 4 — Ports")
-	fmt.Fprintln(p.Out)
-
-	regPort, err := promptValidated(p,
-		fmt.Sprintf("Registry port [%d]", defaults.RegistryPort),
-		fmt.Sprintf("%d", defaults.RegistryPort),
-		validatePort)
-	if err != nil {
-		return nil, err
-	}
-	cfg.RegistryPort = mustAtoi(regPort)
-
-	dashPort, err := promptValidated(p,
-		fmt.Sprintf("Dashboard port [%d]", defaults.DashboardPort),
-		fmt.Sprintf("%d", defaults.DashboardPort),
-		validatePort)
-	if err != nil {
-		return nil, err
-	}
-	cfg.DashboardPort = mustAtoi(dashPort)
-
-	fmt.Fprintln(p.Out, "\n─────────────────────────────────────────")
-
-	// Step 5 — Confirm
-	fmt.Fprintln(p.Out, "\nSTEP 5 — Confirm")
-	fmt.Fprintln(p.Out)
-	fmt.Fprintln(p.Out, "rulekit: here's your configuration:")
-	fmt.Fprintln(p.Out)
-	fmt.Fprint(p.Out, cfg.Summary())
-	fmt.Fprintln(p.Out)
-
-	ok, err := p.PromptConfirm("Save and start?", true)
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		return nil, ErrCancelled
-	}
-
-	return &cfg, nil
+	return runWizardInteractive(existing)
 }
 
 // RunWithDefaults builds a StackConfig from defaults without any prompts (--yes flag).
@@ -245,102 +42,404 @@ func RunWithDefaults(p *Prompter) *StackConfig {
 	return &cfg
 }
 
-// ErrCancelled is returned when the user aborts the wizard.
-var ErrCancelled = fmt.Errorf("setup cancelled. nothing was saved")
-
-// fillSMTP fills SMTP fields on cfg interactively.
-func fillSMTP(p *Prompter, cfg *StackConfig, existing *StackConfig) error {
-	smtpDefaults := &StackConfig{SMTPPort: 587, SMTPFrom: "noreply@rulekit.dev"}
+// runWizardInteractive runs the huh-powered interactive wizard.
+func runWizardInteractive(existing *StackConfig) (*StackConfig, error) {
+	defaults := Defaults()
 	if existing != nil {
-		smtpDefaults = existing
+		defaults = *existing
+	}
+	cfg := defaults
+
+	theme := orangeTheme()
+
+	// ── Step 1: Database ──────────────────────────────────────────────────────
+
+	dbStore := cfg.Store
+	dbURL := cfg.DatabaseURL
+	if dbURL == "" {
+		dbURL = "postgres://rulekit:rulekit@localhost:5432/rulekit"
 	}
 
-	host, err := promptValidated(p, "SMTP host", smtpDefaults.SMTPHost, func(s string) error {
-		if s == "" {
-			return fmt.Errorf("SMTP host is required")
+	dbGroup := huh.NewGroup(
+		huh.NewSelect[string]().
+			Title("Database").
+			Description("Where should rulekit store its data?").
+			Options(
+				huh.NewOption("SQLite   — zero config, great for local dev", "sqlite"),
+				huh.NewOption("Postgres — recommended for production", "postgres"),
+			).
+			Value(&dbStore),
+	)
+
+	if err := huh.NewForm(dbGroup).WithTheme(theme).Run(); err != nil {
+		return nil, errOrCancelled(err)
+	}
+
+	cfg.Store = dbStore
+
+	if dbStore == "postgres" {
+		pgGroup := huh.NewGroup(
+			huh.NewInput().
+				Title("Postgres connection URL").
+				Value(&dbURL).
+				Validate(func(s string) error {
+					if !strings.HasPrefix(s, "postgres://") && !strings.HasPrefix(s, "postgresql://") {
+						return fmt.Errorf("must start with postgres:// or postgresql://")
+					}
+					return nil
+				}),
+		)
+		if err := huh.NewForm(pgGroup).WithTheme(theme).Run(); err != nil {
+			return nil, errOrCancelled(err)
 		}
-		return nil
-	})
-	if err != nil {
-		return err
+		cfg.DatabaseURL = dbURL
+		cfg.DataDir = ""
+	} else {
+		cfg.DataDir = "/data"
+		cfg.DatabaseURL = ""
 	}
-	cfg.SMTPHost = host
 
-	port, err := promptValidated(p, "SMTP port", fmt.Sprintf("%d", smtpDefaults.SMTPPort), validateSMTPPort)
-	if err != nil {
-		return err
+	// ── Step 2: Blob storage ──────────────────────────────────────────────────
+
+	blobStore := cfg.BlobStore
+
+	blobGroup := huh.NewGroup(
+		huh.NewSelect[string]().
+			Title("Blob storage").
+			Description("Where should rule bundles be stored?").
+			Options(
+				huh.NewOption("Filesystem — stored in the container volume", "fs"),
+				huh.NewOption("S3         — AWS S3 or S3-compatible (R2, MinIO)", "s3"),
+			).
+			Value(&blobStore),
+	)
+	if err := huh.NewForm(blobGroup).WithTheme(theme).Run(); err != nil {
+		return nil, errOrCancelled(err)
 	}
-	cfg.SMTPPort = mustAtoi(port)
 
-	username, err := p.PromptText("SMTP username", smtpDefaults.SMTPUsername)
-	if err != nil {
-		return err
-	}
-	cfg.SMTPUsername = username
+	cfg.BlobStore = blobStore
 
-	password, err := p.PromptSecret("SMTP password")
-	if err != nil {
-		return err
-	}
-	if password == "" && existing != nil && smtpDefaults.SMTPPassword != "" {
-		password = smtpDefaults.SMTPPassword
-	}
-	cfg.SMTPPassword = password
+	if blobStore == "s3" {
+		s3Bucket := cfg.S3Bucket
+		s3Region := orDefault(cfg.S3Region, "us-east-1")
+		s3Endpoint := cfg.S3Endpoint
+		s3AccessKey := cfg.S3AccessKeyID
+		s3SecretKey := cfg.S3SecretAccessKey
 
-	fromAddr, err := p.PromptText("From address", orDefault(smtpDefaults.SMTPFrom, "noreply@rulekit.dev"))
-	if err != nil {
-		return err
-	}
-	cfg.SMTPFrom = fromAddr
-
-	useTLS, err := p.PromptConfirm("Use TLS?", false)
-	if err != nil {
-		return err
-	}
-	cfg.SMTPUseTLS = useTLS
-
-	return nil
-}
-
-// promptValidated re-prompts until the validation function returns nil.
-func promptValidated(p *Prompter, question, defaultVal string, validate func(string) error) (string, error) {
-	for {
-		val, err := p.PromptText(question, defaultVal)
-		if err != nil {
-			return "", err
+		s3Group := huh.NewGroup(
+			huh.NewInput().
+				Title("Bucket name").
+				Value(&s3Bucket).
+				Validate(func(s string) error {
+					if s == "" {
+						return fmt.Errorf("bucket name is required")
+					}
+					return nil
+				}),
+			huh.NewInput().
+				Title("Region").
+				Value(&s3Region),
+			huh.NewInput().
+				Title("Endpoint").
+				Description("Leave blank for AWS S3").
+				Value(&s3Endpoint),
+			huh.NewInput().
+				Title("Access key ID").
+				Value(&s3AccessKey).
+				Validate(func(s string) error {
+					if s == "" {
+						return fmt.Errorf("access key ID is required")
+					}
+					return nil
+				}),
+			huh.NewInput().
+				Title("Secret access key").
+				EchoMode(huh.EchoModePassword).
+				Value(&s3SecretKey).
+				Validate(func(s string) error {
+					if s == "" && cfg.S3SecretAccessKey == "" {
+						return fmt.Errorf("secret access key is required")
+					}
+					return nil
+				}),
+		)
+		if err := huh.NewForm(s3Group).WithTheme(theme).Run(); err != nil {
+			return nil, errOrCancelled(err)
 		}
-		if err := validate(val); err != nil {
-			fmt.Fprintf(p.Out, "  rulekit: error: %v\n", err)
-			if !IsTTY() {
-				return "", err
+
+		cfg.S3Bucket = s3Bucket
+		cfg.S3Region = s3Region
+		cfg.S3Endpoint = s3Endpoint
+		cfg.S3AccessKeyID = s3AccessKey
+		if s3SecretKey != "" {
+			cfg.S3SecretAccessKey = s3SecretKey
+		}
+	} else {
+		cfg.S3Bucket = ""
+		cfg.S3Region = ""
+		cfg.S3Endpoint = ""
+		cfg.S3AccessKeyID = ""
+		cfg.S3SecretAccessKey = ""
+	}
+
+	// ── Step 3: Auth ──────────────────────────────────────────────────────────
+
+	adminPassword := ""
+	keepPassword := existing != nil && defaults.AdminPassword != ""
+
+	passwordNote := "Leave blank to auto-generate a secure password."
+	if keepPassword {
+		passwordNote = "Leave blank to keep your existing password."
+	}
+
+	authGroup := huh.NewGroup(
+		huh.NewInput().
+			Title("Admin password").
+			Description(passwordNote).
+			EchoMode(huh.EchoModePassword).
+			Value(&adminPassword),
+	)
+	if err := huh.NewForm(authGroup).WithTheme(theme).Run(); err != nil {
+		return nil, errOrCancelled(err)
+	}
+
+	if adminPassword == "" {
+		if keepPassword {
+			cfg.AdminPassword = defaults.AdminPassword
+		} else {
+			generated, err := GenerateSecret(16)
+			if err != nil {
+				return nil, err
 			}
-			continue
+			cfg.AdminPassword = generated
 		}
-		return val, nil
+	} else {
+		cfg.AdminPassword = adminPassword
 	}
+
+	if existing != nil && defaults.JWTSecret != "" {
+		cfg.JWTSecret = defaults.JWTSecret
+	} else {
+		secret, err := GenerateSecret(32)
+		if err != nil {
+			return nil, err
+		}
+		cfg.JWTSecret = secret
+	}
+
+	// ── Step 4: SMTP ──────────────────────────────────────────────────────────
+
+	configureSMTP := cfg.SMTPEnabled
+
+	smtpGroup := huh.NewGroup(
+		huh.NewConfirm().
+			Title("Configure SMTP?").
+			Description("Without it, OTP codes print to registry stdout.").
+			Value(&configureSMTP),
+	)
+	if err := huh.NewForm(smtpGroup).WithTheme(theme).Run(); err != nil {
+		return nil, errOrCancelled(err)
+	}
+
+	cfg.SMTPEnabled = configureSMTP
+
+	if configureSMTP {
+		smtpHost := cfg.SMTPHost
+		smtpPort := fmt.Sprintf("%d", orDefaultInt(cfg.SMTPPort, 587))
+		smtpUser := cfg.SMTPUsername
+		smtpPass := cfg.SMTPPassword
+		smtpFrom := orDefault(cfg.SMTPFrom, "noreply@rulekit.dev")
+		smtpTLS := cfg.SMTPUseTLS
+
+		smtpDetails := huh.NewGroup(
+			huh.NewInput().
+				Title("SMTP host").
+				Value(&smtpHost).
+				Validate(func(s string) error {
+					if s == "" {
+						return fmt.Errorf("SMTP host is required")
+					}
+					return nil
+				}),
+			huh.NewInput().
+				Title("SMTP port").
+				Value(&smtpPort).
+				Validate(validatePortStr),
+			huh.NewInput().
+				Title("SMTP username").
+				Value(&smtpUser),
+			huh.NewInput().
+				Title("SMTP password").
+				EchoMode(huh.EchoModePassword).
+				Value(&smtpPass),
+			huh.NewInput().
+				Title("From address").
+				Value(&smtpFrom),
+			huh.NewConfirm().
+				Title("Use TLS?").
+				Value(&smtpTLS),
+		)
+		if err := huh.NewForm(smtpDetails).WithTheme(theme).Run(); err != nil {
+			return nil, errOrCancelled(err)
+		}
+
+		cfg.SMTPHost = smtpHost
+		cfg.SMTPPort = mustAtoi(smtpPort)
+		cfg.SMTPUsername = smtpUser
+		if smtpPass != "" {
+			cfg.SMTPPassword = smtpPass
+		}
+		cfg.SMTPFrom = smtpFrom
+		cfg.SMTPUseTLS = smtpTLS
+	} else {
+		cfg.SMTPHost = ""
+		cfg.SMTPUsername = ""
+		cfg.SMTPPassword = ""
+	}
+
+	// ── Step 5: Ports ─────────────────────────────────────────────────────────
+
+	regPort := fmt.Sprintf("%d", cfg.RegistryPort)
+	dashPort := fmt.Sprintf("%d", cfg.DashboardPort)
+
+	portsGroup := huh.NewGroup(
+		huh.NewInput().
+			Title("Registry port").
+			Value(&regPort).
+			Validate(validatePortStr),
+		huh.NewInput().
+			Title("Dashboard port").
+			Value(&dashPort).
+			Validate(validatePortStr),
+	)
+	if err := huh.NewForm(portsGroup).WithTheme(theme).Run(); err != nil {
+		return nil, errOrCancelled(err)
+	}
+
+	cfg.RegistryPort = mustAtoi(regPort)
+	cfg.DashboardPort = mustAtoi(dashPort)
+
+	// ── Step 6: Confirm ───────────────────────────────────────────────────────
+
+	printSummary(&cfg)
+
+	confirm := true
+	confirmGroup := huh.NewGroup(
+		huh.NewConfirm().
+			Title("Save configuration?").
+			Value(&confirm),
+	)
+	if err := huh.NewForm(confirmGroup).WithTheme(theme).Run(); err != nil {
+		return nil, errOrCancelled(err)
+	}
+
+	if !confirm {
+		return nil, ErrCancelled
+	}
+
+	if adminPassword == "" && !keepPassword {
+		fmt.Fprintf(os.Stdout, "\n%s admin password: %s\n%s\n\n",
+			lipgloss.NewStyle().Foreground(orange).Bold(true).Render("✓"),
+			lipgloss.NewStyle().Bold(true).Render(cfg.AdminPassword),
+			lipgloss.NewStyle().Faint(true).Render("  Save this — it will not be shown again."),
+		)
+	}
+
+	return &cfg, nil
 }
+
+// runWizardFallback is the non-TTY path (CI, piped input) — returns defaults.
+func runWizardFallback(p *Prompter, existing *StackConfig) (*StackConfig, error) {
+	cfg := Defaults()
+	if existing != nil {
+		cfg = *existing
+	}
+
+	if cfg.JWTSecret == "" {
+		secret, err := GenerateSecret(32)
+		if err != nil {
+			return nil, err
+		}
+		cfg.JWTSecret = secret
+	}
+	if cfg.AdminPassword == "" {
+		pass, err := GenerateSecret(16)
+		if err != nil {
+			return nil, err
+		}
+		cfg.AdminPassword = pass
+	}
+
+	fmt.Fprintln(p.Out, "rulekit: non-interactive mode — using existing or default config.")
+	return &cfg, nil
+}
+
+// printSummary renders a styled summary box before the confirm prompt.
+func printSummary(cfg *StackConfig) {
+	title := lipgloss.NewStyle().Foreground(orange).Bold(true)
+	label := lipgloss.NewStyle().Faint(true).Width(14)
+	value := lipgloss.NewStyle()
+	box := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(orange).
+		Padding(0, 2).
+		MarginTop(1).
+		MarginBottom(1)
+
+	var lines []string
+	lines = append(lines, title.Render("Configuration summary"))
+	lines = append(lines, "")
+
+	dbVal := "sqlite"
+	if cfg.Store == "postgres" {
+		dbVal = "postgres · " + maskURL(cfg.DatabaseURL)
+	}
+	lines = append(lines, label.Render("database")+value.Render(dbVal))
+
+	blobVal := "filesystem"
+	if cfg.BlobStore == "s3" {
+		blobVal = fmt.Sprintf("s3 · %s (%s)", cfg.S3Bucket, cfg.S3Region)
+	}
+	lines = append(lines, label.Render("blob")+value.Render(blobVal))
+
+	if cfg.SMTPEnabled {
+		lines = append(lines, label.Render("smtp")+value.Render(fmt.Sprintf("%s:%d", cfg.SMTPHost, cfg.SMTPPort)))
+	}
+
+	lines = append(lines, label.Render("registry")+value.Render(fmt.Sprintf("http://localhost:%d", cfg.RegistryPort)))
+	lines = append(lines, label.Render("dashboard")+value.Render(fmt.Sprintf("http://localhost:%d", cfg.DashboardPort)))
+
+	fmt.Println(box.Render(strings.Join(lines, "\n")))
+}
+
+// orangeTheme returns a huh theme using rulekit's orange brand color.
+func orangeTheme() *huh.Theme {
+	t := huh.ThemeBase()
+	t.Focused.Title = t.Focused.Title.Foreground(orange).Bold(true)
+	t.Focused.SelectSelector = t.Focused.SelectSelector.Foreground(orange)
+	t.Focused.SelectedOption = t.Focused.SelectedOption.Foreground(orange)
+	t.Focused.Base = t.Focused.Base.BorderForeground(orange)
+	t.Focused.Description = t.Focused.Description.Faint(true)
+	return t
+}
+
+var orange = lipgloss.Color("#FF7800")
+
+func errOrCancelled(err error) error {
+	if errors.Is(err, huh.ErrUserAborted) {
+		return ErrCancelled
+	}
+	return err
+}
+
+// fillSMTP is no longer used (huh handles it inline), kept for compatibility.
 
 // Validation helpers
 
-func validatePostgresURL(s string) error {
-	if !strings.HasPrefix(s, "postgres://") && !strings.HasPrefix(s, "postgresql://") {
-		return fmt.Errorf("must start with postgres:// or postgresql://")
-	}
-	return nil
-}
-
-func validatePort(s string) error {
+func validatePortStr(s string) error {
 	n := mustAtoi(s)
 	if n < 1024 || n > 65535 {
 		return fmt.Errorf("must be between 1024 and 65535")
-	}
-	return nil
-}
-
-func validateSMTPPort(s string) error {
-	n := mustAtoi(s)
-	if n < 1 || n > 65535 {
-		return fmt.Errorf("must be between 1 and 65535")
 	}
 	return nil
 }
@@ -358,6 +457,13 @@ func mustAtoi(s string) int {
 
 func orDefault(val, fallback string) string {
 	if val != "" {
+		return val
+	}
+	return fallback
+}
+
+func orDefaultInt(val, fallback int) int {
+	if val != 0 {
 		return val
 	}
 	return fallback

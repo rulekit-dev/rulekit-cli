@@ -2,11 +2,12 @@ package stack
 
 import (
 	"errors"
+	"os"
 
 	"github.com/rulekit-dev/rulekit-cli/internal/app/wizard"
+	"github.com/rulekit-dev/rulekit-cli/internal/globals"
 	"github.com/rulekit-dev/rulekit-cli/internal/infra/docker"
 	"github.com/rulekit-dev/rulekit-cli/internal/ui/output"
-	"github.com/rulekit-dev/rulekit-cli/internal/globals"
 	"github.com/spf13/cobra"
 )
 
@@ -21,10 +22,10 @@ var (
 )
 
 var onboardCmd = &cobra.Command{
-	Use:   "onboard",
-	Short: "Configure the RuleKit stack (registry + dashboard)",
+	Use:     "onboard",
+	Short:   "Configure the RuleKit stack (registry + dashboard)",
 	GroupID: "stack",
-	RunE:  runOnboard,
+	RunE:    runOnboard,
 }
 
 func init() {
@@ -50,6 +51,11 @@ func runOnboard(cmd *cobra.Command, args []string) error {
 		return globals.Exitf(1, "%v", err)
 	}
 
+	if err := os.MkdirAll(docker.ComposeDir(), 0o755); err != nil {
+		output.Error("create config dir: %v", err)
+		return globals.Exitf(1, "create config dir: %v", err)
+	}
+
 	if err := wizard.WriteEnv(envPath, cfg.ToEnv()); err != nil {
 		output.Error("write .env: %v", err)
 		return globals.Exitf(1, "write .env: %v", err)
@@ -67,7 +73,7 @@ func runOnboard(cmd *cobra.Command, args []string) error {
 		return globals.Exitf(1, "generate compose: %v", err)
 	}
 
-	output.Info("configuration saved. run 'rulekit stack up' to start the stack.")
+	output.Info("configuration saved. run 'rulekit up' to start the stack.")
 	return nil
 }
 

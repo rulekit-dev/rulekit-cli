@@ -20,7 +20,7 @@ var dashboardCmd = &cobra.Command{
 }
 
 func runDashboard(cmd *cobra.Command, args []string) error {
-	dashboardURL := "http://localhost:3000"
+	dashboardURL := "http://localhost:3001"
 
 	lf, err := lock.Read(globals.LockfilePath)
 	if err == nil && lf.Dashboard != "" {

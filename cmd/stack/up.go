@@ -17,10 +17,10 @@ import (
 )
 
 var upCmd = &cobra.Command{
-	Use:   "up",
-	Short: "Start the RuleKit stack (registry + dashboard) via Docker",
+	Use:     "up",
+	Short:   "Start the RuleKit stack (registry + dashboard) via Docker",
 	GroupID: "stack",
-	RunE:  runUp,
+	RunE:    runUp,
 }
 
 func runUp(cmd *cobra.Command, args []string) error {
@@ -38,7 +38,7 @@ func startStack() error {
 
 	running, _ := client.IsRunning()
 	if running {
-		output.Info("stack is already running. use 'rulekit stack restart' to restart.")
+		output.Info("stack is already running. use 'rulekit restart' to restart.")
 		return nil
 	}
 
@@ -55,8 +55,8 @@ func startStack() error {
 		return globals.Exitf(1, "registry health check failed")
 	}
 
-	output.Info("registry  ready · %s", registryURL)
-	output.Info("dashboard ready · %s", dashboardURL)
+	output.Success("registry  ready · " + output.Highlight(registryURL))
+	output.Success("dashboard ready · " + output.Highlight(dashboardURL))
 	output.Info("run 'rulekit dashboard' to open the editor")
 
 	writeDashboardToLock(registryURL, dashboardURL)

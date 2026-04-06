@@ -18,16 +18,16 @@ import (
 )
 
 var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Infra health check (registry, dashboard, db) and ruleset update status",
+	Use:     "status",
+	Short:   "Infra health check (registry, dashboard, db) and ruleset update status",
 	GroupID: "stack",
-	RunE:  runStatus,
+	RunE:    runStatus,
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
 	composePath := docker.ComposePath()
 	registryURL := "http://localhost:8080"
-	dashboardURL := "http://localhost:3000"
+	dashboardURL := "http://localhost:3001"
 
 	lf, lockErr := lock.Read(globals.LockfilePath)
 	if lockErr == nil {
@@ -39,7 +39,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	output.Info("checking stack…")
+	fmt.Println(output.Label("  Infrastructure"))
 	fmt.Println()
 
 	infraOK := true
@@ -51,16 +51,32 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		if ver == "" {
 			ver = "unknown"
 		}
-		fmt.Fprintf(w, "registry\t%s running · %s · %s\n", output.SymOK(), ver, registryURL)
+		fmt.Fprintf(w, "  %s\t%s  %s\n",
+			output.Label("registry"),
+			output.SymOK(),
+			output.Highlight(registryURL)+" "+output.Muted("· "+ver),
+		)
 	} else {
-		fmt.Fprintf(w, "registry\t%s not running\n", output.SymFail())
+		fmt.Fprintf(w, "  %s\t%s  %s\n",
+			output.Label("registry"),
+			output.SymFail(),
+			output.Muted("not running"),
+		)
 		infraOK = false
 	}
 
 	if health.Reachable(dashboardURL) {
-		fmt.Fprintf(w, "dashboard\t%s running · %s\n", output.SymOK(), dashboardURL)
+		fmt.Fprintf(w, "  %s\t%s  %s\n",
+			output.Label("dashboard"),
+			output.SymOK(),
+			output.Highlight(dashboardURL),
+		)
 	} else {
-		fmt.Fprintf(w, "dashboard\t%s not running\n", output.SymFail())
+		fmt.Fprintf(w, "  %s\t%s  %s\n",
+			output.Label("dashboard"),
+			output.SymFail(),
+			output.Muted("not running"),
+		)
 		infraOK = false
 	}
 
@@ -68,21 +84,32 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	if dbType == "postgres" {
 		client := docker.NewClient(composePath)
 		if client.IsServiceRunning("postgres") {
-			fmt.Fprintf(w, "database\t%s postgres · running\n", output.SymOK())
+			fmt.Fprintf(w, "  %s\t%s  %s\n",
+				output.Label("database"),
+				output.SymOK(),
+				output.Muted("postgres"),
+			)
 		} else {
-			fmt.Fprintf(w, "database\t%s postgres · not running\n", output.SymFail())
+			fmt.Fprintf(w, "  %s\t%s  %s\n",
+				output.Label("database"),
+				output.SymFail(),
+				output.Muted("postgres · not running"),
+			)
 			infraOK = false
 		}
 	} else {
-		dbPath := docker.SQLiteDBPath()
-		fmt.Fprintf(w, "database\t%s sqlite · %s\n", output.SymOK(), dbPath)
+		fmt.Fprintf(w, "  %s\t%s  %s\n",
+			output.Label("database"),
+			output.SymOK(),
+			output.Muted("sqlite · "+docker.SQLiteDBPath()),
+		)
 	}
 
 	w.Flush()
 
 	if lockErr == nil && len(lf.Rulesets) > 0 {
 		fmt.Println()
-		output.Info("checking rulesets…")
+		fmt.Println(output.Label("  Rulesets"))
 		fmt.Println()
 
 		cfg := config.Resolve(globals.Registry, globals.Workspace, globals.Dir, globals.Token, lf.Registry, lf.Workspace)
@@ -92,19 +119,33 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		for key, entry := range lf.Rulesets {
 			meta, err := regClient.GetLatestVersion(context.Background(), key, cfg.Workspace)
 			if err != nil {
-				fmt.Fprintf(w2, "%s\t%s not found in registry\n", key, output.SymFail())
+				fmt.Fprintf(w2, "  %s\t%s  %s\n",
+					output.Label(key),
+					output.SymFail(),
+					output.Muted("not found in registry"),
+				)
 				continue
 			}
 			if entry.Version >= meta.Version {
-				fmt.Fprintf(w2, "%s\t%s v%d · up to date\n", key, output.SymOK(), entry.Version)
+				fmt.Fprintf(w2, "  %s\t%s  %s\n",
+					output.Label(key),
+					output.SymOK(),
+					output.Muted(fmt.Sprintf("v%d · up to date", entry.Version)),
+				)
 			} else {
-				fmt.Fprintf(w2, "%s\t%s v%d → v%d available\n", key, output.SymWarn(), entry.Version, meta.Version)
+				fmt.Fprintf(w2, "  %s\t%s  %s\n",
+					output.Label(key),
+					output.SymWarn(),
+					output.Warn2(fmt.Sprintf("v%d → v%d available", entry.Version, meta.Version)),
+				)
 			}
 		}
 		w2.Flush()
 	} else if errors.Is(lockErr, os.ErrNotExist) {
 		// No lockfile — skip ruleset section silently.
 	}
+
+	fmt.Println()
 
 	if !infraOK {
 		return globals.Exitf(1, "one or more infra checks failed")

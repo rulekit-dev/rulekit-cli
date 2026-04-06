@@ -2,7 +2,6 @@ package stack
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/rulekit-dev/rulekit-cli/internal/domain/lock"
@@ -41,7 +40,7 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 	}
 
 	registryURL := "http://localhost:8080"
-	dashboardURL := "http://localhost:3000"
+	dashboardURL := "http://localhost:3001"
 
 	if lf, err := lock.Read(globals.LockfilePath); err == nil {
 		if lf.Registry != "" {
@@ -58,9 +57,9 @@ func runUpgrade(cmd *cobra.Command, args []string) error {
 		return globals.Exitf(1, "registry health check failed")
 	}
 
-	output.Info("images updated.")
-	output.Info("registry  ready · %s", fmt.Sprint(registryURL))
-	output.Info("dashboard ready · %s", fmt.Sprint(dashboardURL))
+	output.Success("images updated.")
+	output.Success("registry  ready · " + output.Highlight(registryURL))
+	output.Success("dashboard ready · " + output.Highlight(dashboardURL))
 
 	return nil
 }
