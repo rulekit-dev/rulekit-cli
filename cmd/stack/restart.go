@@ -22,6 +22,5 @@ func runRestart(cmd *cobra.Command, args []string) error {
 	// Stop silently.
 	stopStack(true)
 
-	// Start using the existing compose file — do not regenerate.
-	return startStack(false)
+	return startStack()
 }

@@ -16,89 +16,29 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	upPostgres       bool
-	upPort           int
-	upDashboardPort  int
-	upRegistryImage  string
-	upDashboardImage string
-	upYes            bool
-	upReconfigure    bool
-)
-
 var upCmd = &cobra.Command{
 	Use:   "up",
 	Short: "Start the RuleKit stack (registry + dashboard) via Docker",
 	RunE:  runUp,
 }
 
-func init() {
-	upCmd.Flags().BoolVar(&upPostgres, "postgres", false, "Use Postgres instead of SQLite")
-	upCmd.Flags().IntVar(&upPort, "port", 8080, "Registry port")
-	upCmd.Flags().IntVar(&upDashboardPort, "dashboard-port", 3001, "Dashboard port")
-	upCmd.Flags().StringVar(&upRegistryImage, "registry-image", "ghcr.io/rulekit-dev/rulekit-registry:latest", "Registry Docker image")
-	upCmd.Flags().StringVar(&upDashboardImage, "dashboard-image", "ghcr.io/rulekit-dev/rulekit-dashboard:latest", "Dashboard Docker image")
-	upCmd.Flags().BoolVar(&upYes, "yes", false, "Skip wizard and accept all defaults (for CI/scripted use)")
-	upCmd.Flags().BoolVar(&upReconfigure, "reconfigure", false, "Re-run the setup wizard even if config already exists")
-}
-
 func runUp(cmd *cobra.Command, args []string) error {
-	return startStack(true)
+	return startStack()
 }
 
-func startStack(regenerate bool) error {
+func startStack() error {
 	if err := docker.CheckDocker(); err != nil {
 		output.Error("%v", err)
 		return globals.Exitf(1, "%v", err)
 	}
 
-	envPath := docker.EnvPath()
 	composePath := docker.ComposePath()
-
-	if regenerate {
-		cfg, err := resolveConfig(envPath)
-		if err != nil {
-			if errors.Is(err, wizard.ErrCancelled) {
-				output.Info("setup cancelled. nothing was saved.")
-				return nil
-			}
-			output.Error("%v", err)
-			return globals.Exitf(1, "%v", err)
-		}
-
-		if err := wizard.WriteEnv(envPath, cfg.ToEnv()); err != nil {
-			output.Error("write .env: %v", err)
-			return globals.Exitf(1, "write .env: %v", err)
-		}
-
-		opts := docker.ComposeOptions{
-			RegistryPort:   cfg.RegistryPort,
-			DashboardPort:  cfg.DashboardPort,
-			UsePostgres:    cfg.Store == "postgres",
-			RegistryImage:  upRegistryImage,
-			DashboardImage: upDashboardImage,
-		}
-		if err := docker.GenerateCompose(opts); err != nil {
-			output.Error("generate compose: %v", err)
-			return globals.Exitf(1, "generate compose: %v", err)
-		}
-
-		if upReconfigure {
-			output.Info("stopping stack…")
-			docker.NewClient(composePath).DownSilent()
-			output.Info("writing new configuration…")
-			output.Info("starting stack…")
-		}
-	}
-
 	client := docker.NewClient(composePath)
 
-	if !upReconfigure {
-		running, _ := client.IsRunning()
-		if running {
-			output.Info("stack is already running. use 'rulekit restart' to restart.")
-			return nil
-		}
+	running, _ := client.IsRunning()
+	if running {
+		output.Info("stack is already running. use 'rulekit stack restart' to restart.")
+		return nil
 	}
 
 	if err := client.Up(); err != nil {
@@ -123,30 +63,9 @@ func startStack(regenerate bool) error {
 	return nil
 }
 
-func resolveConfig(envPath string) (*wizard.StackConfig, error) {
-	envExists := wizard.EnvExists(envPath)
-
-	switch {
-	case upYes:
-		return wizard.RunWithDefaults(wizard.Default), nil
-	case upReconfigure:
-		var existing *wizard.StackConfig
-		if envExists {
-			if loaded, err := wizard.LoadFromEnv(envPath); err == nil {
-				existing = loaded
-			}
-		}
-		return wizard.RunWizard(wizard.Default, existing)
-	case envExists:
-		return wizard.LoadFromEnv(envPath)
-	default:
-		return wizard.RunWizard(wizard.Default, nil)
-	}
-}
-
 func resolveStackURLs() (registryURL, dashboardURL string) {
-	registryURL = fmt.Sprintf("http://localhost:%d", upPort)
-	dashboardURL = fmt.Sprintf("http://localhost:%d", upDashboardPort)
+	registryURL = fmt.Sprintf("http://localhost:%d", 8080)
+	dashboardURL = fmt.Sprintf("http://localhost:%d", 3001)
 
 	if cfg, err := wizard.LoadFromEnv(docker.EnvPath()); err == nil {
 		if cfg.RegistryPort > 0 {

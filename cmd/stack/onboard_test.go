@@ -14,11 +14,11 @@ func TestResolveConfig_YesFlag(t *testing.T) {
 	envPath := filepath.Join(dir, ".env")
 
 	// --yes flag set, no existing .env
-	upYes = true
-	upReconfigure = false
+	onboardYes = true
+	onboardReconfigure = false
 	t.Cleanup(func() {
-		upYes = false
-		upReconfigure = false
+		onboardYes = false
+		onboardReconfigure = false
 	})
 
 	cfg, err := resolveConfig(envPath)
@@ -47,11 +47,11 @@ func TestResolveConfig_ExistingEnvSkipsWizard(t *testing.T) {
 		t.Fatalf("write env: %v", err)
 	}
 
-	upYes = false
-	upReconfigure = false
+	onboardYes = false
+	onboardReconfigure = false
 	t.Cleanup(func() {
-		upYes = false
-		upReconfigure = false
+		onboardYes = false
+		onboardReconfigure = false
 	})
 
 	cfg, err := resolveConfig(envPath)
@@ -77,11 +77,11 @@ func TestResolveConfig_ReconfigureFlag(t *testing.T) {
 		t.Fatalf("write env: %v", err)
 	}
 
-	upYes = false
-	upReconfigure = true
+	onboardYes = false
+	onboardReconfigure = true
 	t.Cleanup(func() {
-		upYes = false
-		upReconfigure = false
+		onboardYes = false
+		onboardReconfigure = false
 	})
 
 	// In non-TTY (test environment), RunWizard returns defaults from the existing config.
