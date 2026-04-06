@@ -9,12 +9,13 @@ import (
 
 // --- ToEnv ---
 
-func TestToEnv_SQLite_FS_None(t *testing.T) {
+func TestToEnv_SQLite_FS(t *testing.T) {
 	cfg := &StackConfig{
 		Store:         "sqlite",
 		DataDir:       "/data",
 		BlobStore:     "fs",
-		Auth:          "none",
+		JWTSecret:     "testsecret",
+		AdminPassword: "testpass",
 		RegistryPort:  8080,
 		DashboardPort: 3001,
 	}
@@ -23,18 +24,17 @@ func TestToEnv_SQLite_FS_None(t *testing.T) {
 	assertContains(t, env, "RULEKIT_STORE=sqlite")
 	assertContains(t, env, "RULEKIT_DATA_DIR=/data")
 	assertContains(t, env, "RULEKIT_BLOB_STORE=fs")
-	assertContains(t, env, "RULEKIT_AUTH=none")
+	assertContains(t, env, "RULEKIT_JWT_SECRET=testsecret")
+	assertContains(t, env, "RULEKIT_ADMIN_PASSWORD=testpass")
 	assertContains(t, env, "RULEKIT_ADDR=:8080")
 	assertContains(t, env, "RULEKIT_CORS_ORIGINS=http://localhost:3001")
 
 	assertNotContains(t, env, "RULEKIT_DATABASE_URL")
 	assertNotContains(t, env, "RULEKIT_S3_")
-	assertNotContains(t, env, "RULEKIT_JWT_SECRET")
 	assertNotContains(t, env, "RULEKIT_SMTP_")
-	assertNotContains(t, env, "RULEKIT_API_KEY")
 }
 
-func TestToEnv_Postgres_S3_JWT_SMTP(t *testing.T) {
+func TestToEnv_Postgres_S3_SMTP(t *testing.T) {
 	cfg := &StackConfig{
 		Store:             "postgres",
 		DatabaseURL:       "postgres://rulekit:rulekit@localhost:5432/rulekit",
@@ -44,9 +44,8 @@ func TestToEnv_Postgres_S3_JWT_SMTP(t *testing.T) {
 		S3Endpoint:        "https://r2.example.com",
 		S3AccessKeyID:     "AKIA123",
 		S3SecretAccessKey: "secret",
-		Auth:              "jwt",
 		JWTSecret:         "abc123",
-		AdminEmail:        "admin@example.com",
+		AdminPassword:     "adminpass",
 		SMTPEnabled:       true,
 		SMTPHost:          "smtp.example.com",
 		SMTPPort:          587,
@@ -67,9 +66,8 @@ func TestToEnv_Postgres_S3_JWT_SMTP(t *testing.T) {
 	assertContains(t, env, "RULEKIT_S3_ENDPOINT=https://r2.example.com")
 	assertContains(t, env, "RULEKIT_S3_ACCESS_KEY_ID=AKIA123")
 	assertContains(t, env, "RULEKIT_S3_SECRET_ACCESS_KEY=secret")
-	assertContains(t, env, "RULEKIT_AUTH=jwt")
 	assertContains(t, env, "RULEKIT_JWT_SECRET=abc123")
-	assertContains(t, env, "RULEKIT_ADMIN_EMAIL=admin@example.com")
+	assertContains(t, env, "RULEKIT_ADMIN_PASSWORD=adminpass")
 	assertContains(t, env, "RULEKIT_SMTP_HOST=smtp.example.com")
 	assertContains(t, env, "RULEKIT_SMTP_PORT=587")
 	assertContains(t, env, "RULEKIT_SMTP_USERNAME=user")
@@ -78,22 +76,6 @@ func TestToEnv_Postgres_S3_JWT_SMTP(t *testing.T) {
 	assertContains(t, env, "RULEKIT_SMTP_USE_TLS=false")
 
 	assertNotContains(t, env, "RULEKIT_DATA_DIR")
-}
-
-func TestToEnv_SQLite_FS_APIKey(t *testing.T) {
-	cfg := &StackConfig{
-		Store:         "sqlite",
-		DataDir:       "/data",
-		BlobStore:     "fs",
-		Auth:          "none",
-		APIKey:        "myapikey",
-		RegistryPort:  8080,
-		DashboardPort: 3001,
-	}
-	env := cfg.ToEnv()
-
-	assertContains(t, env, "RULEKIT_API_KEY=myapikey")
-	assertNotContains(t, env, "RULEKIT_JWT_SECRET")
 }
 
 // --- LoadFromEnv roundtrip ---
@@ -108,9 +90,8 @@ func TestLoadFromEnv_Roundtrip(t *testing.T) {
 		S3Endpoint:        "",
 		S3AccessKeyID:     "AKIA",
 		S3SecretAccessKey: "sec",
-		Auth:              "jwt",
 		JWTSecret:         "jwt-secret",
-		AdminEmail:        "a@b.com",
+		AdminPassword:     "adminpass",
 		SMTPEnabled:       true,
 		SMTPHost:          "smtp.host",
 		SMTPPort:          465,
@@ -141,9 +122,8 @@ func TestLoadFromEnv_Roundtrip(t *testing.T) {
 	assertEqual(t, "S3Region", got.S3Region, cfg.S3Region)
 	assertEqual(t, "S3AccessKeyID", got.S3AccessKeyID, cfg.S3AccessKeyID)
 	assertEqual(t, "S3SecretAccessKey", got.S3SecretAccessKey, cfg.S3SecretAccessKey)
-	assertEqual(t, "Auth", got.Auth, cfg.Auth)
 	assertEqual(t, "JWTSecret", got.JWTSecret, cfg.JWTSecret)
-	assertEqual(t, "AdminEmail", got.AdminEmail, cfg.AdminEmail)
+	assertEqual(t, "AdminPassword", got.AdminPassword, cfg.AdminPassword)
 	assertEqual(t, "SMTPHost", got.SMTPHost, cfg.SMTPHost)
 	if got.SMTPPort != cfg.SMTPPort {
 		t.Errorf("SMTPPort: got %d, want %d", got.SMTPPort, cfg.SMTPPort)
@@ -182,21 +162,17 @@ func TestLoadFromEnv_MissingOptionalFields(t *testing.T) {
 	if got.BlobStore != "fs" {
 		t.Errorf("BlobStore default: got %q, want %q", got.BlobStore, "fs")
 	}
-	if got.Auth != "none" {
-		t.Errorf("Auth default: got %q, want %q", got.Auth, "none")
-	}
 }
 
 // --- Summary masking ---
 
-func TestSummary_MasksSecret(t *testing.T) {
+func TestSummary_MasksSecrets(t *testing.T) {
 	cfg := &StackConfig{
 		Store:         "postgres",
 		DatabaseURL:   "postgres://rulekit:supersecret@localhost:5432/rulekit",
 		BlobStore:     "fs",
-		Auth:          "jwt",
 		JWTSecret:     "topsecretjwt",
-		AdminEmail:    "admin@example.com",
+		AdminPassword: "topsecretpass",
 		RegistryPort:  8080,
 		DashboardPort: 3001,
 	}
@@ -208,24 +184,11 @@ func TestSummary_MasksSecret(t *testing.T) {
 	if strings.Contains(summary, "topsecretjwt") {
 		t.Error("Summary should not contain raw JWT secret")
 	}
+	if strings.Contains(summary, "topsecretpass") {
+		t.Error("Summary should not contain raw admin password")
+	}
 	if !strings.Contains(summary, "***") {
-		t.Error("Summary should contain *** for masked password")
-	}
-}
-
-func TestSummary_APIKeyMasked(t *testing.T) {
-	cfg := &StackConfig{
-		Store:         "sqlite",
-		BlobStore:     "fs",
-		Auth:          "none",
-		APIKey:        "myrawkey",
-		RegistryPort:  8080,
-		DashboardPort: 3001,
-	}
-	summary := cfg.Summary()
-
-	if strings.Contains(summary, "myrawkey") {
-		t.Error("Summary should mask API key")
+		t.Error("Summary should contain *** for masked values")
 	}
 }
 

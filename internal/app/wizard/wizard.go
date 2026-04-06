@@ -133,106 +133,51 @@ func RunWizard(p *Prompter, existing *StackConfig) (*StackConfig, error) {
 
 	// Step 3 — Authentication
 	fmt.Fprintln(p.Out, "\nSTEP 3 — Authentication")
-	fmt.Fprintln(p.Out, "\n  How should the registry be protected?")
+	fmt.Fprintln(p.Out)
 
-	authDefault := 0
-	if defaults.APIKey != "" {
-		authDefault = 1
-	} else if defaults.Auth == "jwt" {
-		authDefault = 2
-	}
-	authIdx, err := p.PromptSelect("", []string{
-		"None    — open access, no login required (default for local dev)",
-		"API key — protect with a shared token",
-		"JWT     — full auth with email + OTP login",
-	}, authDefault)
+	adminPassword, err := p.PromptSecret("Admin password (leave blank to generate one)")
 	if err != nil {
 		return nil, err
 	}
-
-	switch authIdx {
-	case 0:
-		cfg.Auth = "none"
-		cfg.APIKey = ""
-		cfg.JWTSecret = ""
-		cfg.AdminEmail = ""
-
-	case 1:
-		cfg.Auth = "none"
-		cfg.JWTSecret = ""
-		cfg.AdminEmail = ""
-
-		apiKey, err := p.PromptText("API key (leave blank to generate one)", "")
-		if err != nil {
-			return nil, err
-		}
-		if apiKey == "" {
-			if existing != nil && defaults.APIKey != "" {
-				// --reconfigure: keep existing if user pressed enter.
-				apiKey = defaults.APIKey
-				fmt.Fprintln(p.Out, "  rulekit: keeping existing API key.")
-			} else {
-				generated, err := GenerateAPIKey()
-				if err != nil {
-					return nil, err
-				}
-				apiKey = generated
-				fmt.Fprintf(p.Out, "  rulekit: generated API key: %s\n", apiKey)
-				fmt.Fprintln(p.Out, "  rulekit: save this — it will not be shown again.")
-			}
-		}
-		cfg.APIKey = apiKey
-
-	case 2:
-		cfg.Auth = "jwt"
-		cfg.APIKey = ""
-
-		email, err := promptValidated(p, "Admin email", defaults.AdminEmail, func(s string) error {
-			if !strings.Contains(s, "@") {
-				return fmt.Errorf("must be a valid email address")
-			}
-			return nil
-		})
-		if err != nil {
-			return nil, err
-		}
-		cfg.AdminEmail = email
-
-		jwtPrompt := "JWT secret (leave blank to generate one)"
-		jwtInput, err := p.PromptSecret(jwtPrompt)
-		if err != nil {
-			return nil, err
-		}
-		if jwtInput == "" {
-			if existing != nil && defaults.JWTSecret != "" {
-				cfg.JWTSecret = defaults.JWTSecret
-				fmt.Fprintln(p.Out, "  rulekit: keeping existing JWT secret.")
-			} else {
-				secret, err := GenerateSecret(32)
-				if err != nil {
-					return nil, err
-				}
-				cfg.JWTSecret = secret
-				fmt.Fprintln(p.Out, "  rulekit: JWT secret generated.")
-			}
+	if adminPassword == "" {
+		if existing != nil && defaults.AdminPassword != "" {
+			adminPassword = defaults.AdminPassword
+			fmt.Fprintln(p.Out, "  rulekit: keeping existing admin password.")
 		} else {
-			cfg.JWTSecret = jwtInput
-		}
-
-		configureSMTP, err := p.PromptConfirm("Configure SMTP? Without it, OTP codes print to registry stdout.", false)
-		if err != nil {
-			return nil, err
-		}
-		cfg.SMTPEnabled = configureSMTP
-		if configureSMTP {
-			if err := fillSMTP(p, &cfg, existing); err != nil {
+			generated, err := GenerateSecret(16)
+			if err != nil {
 				return nil, err
 			}
-		} else {
-			cfg.SMTPHost = ""
-			cfg.SMTPUsername = ""
-			cfg.SMTPPassword = ""
+			adminPassword = generated
+			fmt.Fprintf(p.Out, "  rulekit: generated admin password: %s\n", adminPassword)
+			fmt.Fprintln(p.Out, "  rulekit: save this — it will not be shown again.")
 		}
+	}
+	cfg.AdminPassword = adminPassword
+
+	if existing != nil && defaults.JWTSecret != "" {
+		cfg.JWTSecret = defaults.JWTSecret
+	} else {
+		secret, err := GenerateSecret(32)
+		if err != nil {
+			return nil, err
+		}
+		cfg.JWTSecret = secret
+	}
+
+	configureSMTP, err := p.PromptConfirm("Configure SMTP? Without it, OTP codes print to registry stdout.", false)
+	if err != nil {
+		return nil, err
+	}
+	cfg.SMTPEnabled = configureSMTP
+	if configureSMTP {
+		if err := fillSMTP(p, &cfg, existing); err != nil {
+			return nil, err
+		}
+	} else {
+		cfg.SMTPHost = ""
+		cfg.SMTPUsername = ""
+		cfg.SMTPPassword = ""
 	}
 
 	fmt.Fprintln(p.Out, "\n─────────────────────────────────────────")
@@ -281,14 +226,22 @@ func RunWizard(p *Prompter, existing *StackConfig) (*StackConfig, error) {
 }
 
 // RunWithDefaults builds a StackConfig from defaults without any prompts (--yes flag).
+// JWTSecret and AdminPassword are always auto-generated.
 func RunWithDefaults(p *Prompter) *StackConfig {
 	cfg := Defaults()
-	fmt.Fprintln(p.Out, "rulekit: using defaults (--yes). run 'rulekit up --reconfigure' to change.")
-	fmt.Fprintf(p.Out, "rulekit: database  sqlite\n")
-	fmt.Fprintf(p.Out, "rulekit: blob      filesystem\n")
-	fmt.Fprintf(p.Out, "rulekit: auth      none\n")
-	fmt.Fprintf(p.Out, "rulekit: registry  http://localhost:%d\n", cfg.RegistryPort)
-	fmt.Fprintf(p.Out, "rulekit: dashboard http://localhost:%d\n", cfg.DashboardPort)
+
+	jwtSecret, _ := GenerateSecret(32)
+	cfg.JWTSecret = jwtSecret
+
+	adminPassword, _ := GenerateSecret(16)
+	cfg.AdminPassword = adminPassword
+
+	fmt.Fprintln(p.Out, "rulekit: using defaults (--yes). run 'rulekit onboard --reconfigure' to change.")
+	fmt.Fprintf(p.Out, "rulekit: database       sqlite\n")
+	fmt.Fprintf(p.Out, "rulekit: blob           filesystem\n")
+	fmt.Fprintf(p.Out, "rulekit: admin password %s\n", adminPassword)
+	fmt.Fprintf(p.Out, "rulekit: registry       http://localhost:%d\n", cfg.RegistryPort)
+	fmt.Fprintf(p.Out, "rulekit: dashboard      http://localhost:%d\n", cfg.DashboardPort)
 	return &cfg
 }
 
