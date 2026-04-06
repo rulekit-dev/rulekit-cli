@@ -13,6 +13,7 @@ import (
 var removeCmd = &cobra.Command{
 	Use:   "remove <key>",
 	Short: "Remove a ruleset from the lockfile and delete local files",
+	GroupID: "ruleset",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runRemove,
 }

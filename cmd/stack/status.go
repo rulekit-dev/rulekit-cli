@@ -20,6 +20,7 @@ import (
 var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Infra health check (registry, dashboard, db) and ruleset update status",
+	GroupID: "stack",
 	RunE:  runStatus,
 }
 

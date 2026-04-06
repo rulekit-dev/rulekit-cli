@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/rulekit-dev/rulekit-cli/cmd/ruleset"
 	"github.com/rulekit-dev/rulekit-cli/cmd/stack"
@@ -11,9 +12,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const banner = `
+ ██████╗ ██╗   ██╗██╗     ███████╗██╗  ██╗██╗████████╗
+ ██╔══██╗██║   ██║██║     ██╔════╝██║ ██╔╝██║╚══██╔══╝
+ ██████╔╝██║   ██║██║     █████╗  █████╔╝ ██║   ██║
+ ██╔══██╗██║   ██║██║     ██╔══╝  ██╔═██╗ ██║   ██║
+ ██║  ██║╚██████╔╝███████╗███████╗██║  ██╗██║   ██║
+ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝╚═╝   ╚═╝
+`
+
 var rootCmd = &cobra.Command{
 	Use:   "rulekit",
-	Short: "rulekit-cli pulls and manages rule bundles from the rulekit-registry",
+	Short: "Rule bundle manager",
+	Long:  colorBanner(),
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if globals.Verbose {
 			slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
@@ -42,6 +53,41 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&globals.Token, "token", "", "Bearer token")
 	rootCmd.PersistentFlags().BoolVar(&globals.Verbose, "verbose", false, "Enable structured logging")
 
+	rootCmd.AddGroup(
+		&cobra.Group{ID: "stack", Title: "Stack"},
+		&cobra.Group{ID: "ruleset", Title: "Rulesets"},
+	)
+
 	stack.Register(rootCmd)
 	ruleset.Register(rootCmd)
+}
+
+// colorBanner returns the banner with orange ANSI color if the terminal supports it.
+func colorBanner() string {
+	if !isColorTerm() {
+		return banner + "\n"
+	}
+	const orange = "\033[38;2;255;120;0m"
+	const reset = "\033[0m"
+	lines := strings.Split(banner, "\n")
+	for i, l := range lines {
+		if l != "" {
+			lines[i] = orange + l + reset
+		}
+	}
+	return strings.Join(lines, "\n") + "\n"
+}
+
+func isColorTerm() bool {
+	if os.Getenv("NO_COLOR") != "" {
+		return false
+	}
+	if os.Getenv("TERM") == "dumb" {
+		return false
+	}
+	fi, err := os.Stdout.Stat()
+	if err != nil {
+		return false
+	}
+	return (fi.Mode() & os.ModeCharDevice) != 0
 }

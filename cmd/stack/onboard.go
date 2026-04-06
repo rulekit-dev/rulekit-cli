@@ -23,6 +23,7 @@ var (
 var onboardCmd = &cobra.Command{
 	Use:   "onboard",
 	Short: "Configure the RuleKit stack (registry + dashboard)",
+	GroupID: "stack",
 	RunE:  runOnboard,
 }
 

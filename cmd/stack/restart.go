@@ -10,6 +10,7 @@ import (
 var restartCmd = &cobra.Command{
 	Use:   "restart",
 	Short: "Stop and restart the RuleKit stack (preserves existing config)",
+	GroupID: "stack",
 	RunE:  runRestart,
 }
 

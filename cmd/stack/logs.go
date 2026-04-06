@@ -15,6 +15,7 @@ var (
 var logsCmd = &cobra.Command{
 	Use:   "logs",
 	Short: "Tail container logs for the RuleKit stack",
+	GroupID: "stack",
 	RunE:  runLogs,
 }
 

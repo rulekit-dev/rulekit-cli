@@ -20,6 +20,7 @@ var (
 var addCmd = &cobra.Command{
 	Use:   "add <key>",
 	Short: "Add a ruleset to the lockfile and pull it",
+	GroupID: "ruleset",
 	Args:  cobra.ExactArgs(1),
 	RunE:  runAdd,
 }

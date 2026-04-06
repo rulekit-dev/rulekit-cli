@@ -16,6 +16,7 @@ import (
 var upgradeCmd = &cobra.Command{
 	Use:   "upgrade",
 	Short: "Pull latest images and perform a rolling restart",
+	GroupID: "stack",
 	RunE:  runUpgrade,
 }
 

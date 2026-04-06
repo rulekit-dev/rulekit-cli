@@ -10,6 +10,7 @@ import (
 var downCmd = &cobra.Command{
 	Use:   "down",
 	Short: "Stop all RuleKit stack containers",
+	GroupID: "stack",
 	RunE:  runDown,
 }
 

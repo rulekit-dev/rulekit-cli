@@ -14,6 +14,7 @@ import (
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all locked rulesets",
+	GroupID: "ruleset",
 	RunE:  runList,
 }
 

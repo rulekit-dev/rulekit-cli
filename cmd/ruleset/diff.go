@@ -15,6 +15,7 @@ import (
 var diffCmd = &cobra.Command{
 	Use:   "diff",
 	Short: "Compare local locked versions vs registry latest",
+	GroupID: "ruleset",
 	RunE:  runDiff,
 }
 

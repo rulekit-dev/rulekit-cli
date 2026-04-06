@@ -15,6 +15,7 @@ import (
 var uninstallCmd = &cobra.Command{
 	Use:   "uninstall",
 	Short: "Stop containers and remove ~/.rulekit/compose/",
+	GroupID: "stack",
 	RunE:  runUninstall,
 }
 

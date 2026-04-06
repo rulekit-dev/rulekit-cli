@@ -19,6 +19,7 @@ import (
 var upCmd = &cobra.Command{
 	Use:   "up",
 	Short: "Start the RuleKit stack (registry + dashboard) via Docker",
+	GroupID: "stack",
 	RunE:  runUp,
 }
 

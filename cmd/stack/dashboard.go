@@ -15,6 +15,7 @@ import (
 var dashboardCmd = &cobra.Command{
 	Use:   "dashboard",
 	Short: "Open the RuleKit dashboard in your default browser",
+	GroupID: "stack",
 	RunE:  runDashboard,
 }
 

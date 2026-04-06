@@ -14,6 +14,7 @@ import (
 var verifyCmd = &cobra.Command{
 	Use:   "verify",
 	Short: "Verify checksums of locally pulled rule bundles",
+	GroupID: "ruleset",
 	RunE:  runVerify,
 }
 

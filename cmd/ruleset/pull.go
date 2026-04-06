@@ -25,6 +25,7 @@ var (
 var pullCmd = &cobra.Command{
 	Use:   "pull",
 	Short: "Pull rule bundles from the registry",
+	GroupID: "ruleset",
 	RunE:  runPull,
 }
 
