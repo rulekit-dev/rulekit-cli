@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/rulekit-dev/rulekit-cli/internal/app/userconfig"
 	"golang.org/x/term"
 )
 
@@ -23,6 +24,19 @@ func Resolve(flagRegistry, flagWorkspace, flagDir, flagAPIKey string, lockRegist
 		RegistryURL: "http://localhost:8080",
 		Workspace:   "default",
 		Dir:         ".rulekit",
+	}
+
+	// User config file (~/.rulekit/config) — lower priority than env/flags.
+	if uc, err := userconfig.Load(); err == nil {
+		if uc.RegistryURL != "" {
+			cfg.RegistryURL = uc.RegistryURL
+		}
+		if uc.Workspace != "" {
+			cfg.Workspace = uc.Workspace
+		}
+		if uc.APIKey != "" {
+			cfg.APIKey = uc.APIKey
+		}
 	}
 
 	if lockRegistry != "" {

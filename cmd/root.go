@@ -29,27 +29,28 @@ var (
 	clrDesc   = lipgloss.Color("#999999")
 )
 
-// commandOrder defines the ordered list of commands shown in the interactive menu.
-// Sorted by likely execution order: setup → daily use → maintenance.
-// section marks the start of a new group; consecutive same-section entries share the header.
-var commandOrder = []struct {
-	name    string
-	section string
-}{
-	{"onboard", "Setup"},
-	{"up", ""},
-	{"add", "Rulesets"},
-	{"pull", ""},
-	{"list", ""},
-	{"diff", ""},
-	{"verify", ""},
-	{"status", "Maintenance"},
-	{"dashboard", ""},
-	{"logs", ""},
-	{"restart", ""},
-	{"upgrade", ""},
-	{"down", ""},
-	{"uninstall", ""},
+// infraCommands lists commands shown under the "Infra" category.
+var infraCommands = []string{
+	"onboard",
+	"up",
+	"config",
+	"status",
+	"dashboard",
+	"logs",
+	"restart",
+	"upgrade",
+	"down",
+	"uninstall",
+}
+
+// rulesetCommands lists commands shown under the "Rulesets" category.
+var rulesetCommands = []string{
+	"add",
+	"pull",
+	"list",
+	"diff",
+	"verify",
+	"config",
 }
 
 var rootCmd = &cobra.Command{
@@ -105,9 +106,14 @@ func init() {
 	})
 }
 
-const sectionPrefix = "§" // sentinel prefix marking non-selectable section headers
+const (
+	categoryInfra   = "infra"
+	categoryRuleset = "ruleset"
+	actionBack      = "__back__"
+	actionExit      = "__exit__"
+)
 
-// runInteractive shows the banner and a huh selector to pick and run a command.
+// runInteractive shows the banner, prompts for a category, then a command within it.
 func runInteractive(root *cobra.Command) error {
 	fmt.Print(renderBanner(true))
 	fmt.Println()
@@ -119,46 +125,81 @@ func runInteractive(root *cobra.Command) error {
 		cmdMap[sub.Name()] = sub
 	}
 
-	headerStyle := lipgloss.NewStyle().Foreground(clrOrange).Bold(true)
-	cmdStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Bold(true)
-	descStyle := lipgloss.NewStyle().Foreground(clrDesc)
-
-	var options []huh.Option[string]
-	for _, entry := range commandOrder {
-		if entry.section != "" {
-			label := headerStyle.Render("  " + strings.ToUpper(entry.section))
-			options = append(options, huh.NewOption(label, sectionPrefix+entry.section))
-		}
-		sub, ok := cmdMap[entry.name]
-		if !ok {
-			continue
-		}
-		label := "  " + cmdStyle.Render(fmt.Sprintf("%-12s", sub.Name())) + " " + descStyle.Render(sub.Short)
-		options = append(options, huh.NewOption(label, sub.Name()))
-	}
-
 	theme := interactiveTheme()
+	mutedStyle := lipgloss.NewStyle().Foreground(clrMuted)
 
 	for {
-		var chosen string
-		form := huh.NewForm(
+		// Step 1: pick category.
+		var category string
+		categoryForm := huh.NewForm(
 			huh.NewGroup(
 				huh.NewSelect[string]().
-					Title("What can I help you with?").
-					Options(options...).
-					Value(&chosen),
+					Title("What do you want to do?").
+					Options(
+						huh.NewOption("  Manage Infra", categoryInfra),
+						huh.NewOption("  Manage Rulesets", categoryRuleset),
+						huh.NewOption(mutedStyle.Render("  Exit"), actionExit),
+					).
+					Value(&category),
 			),
 		).WithTheme(theme)
 
-		if err := form.Run(); err != nil {
+		if err := categoryForm.Run(); err != nil {
 			if errors.Is(err, huh.ErrUserAborted) {
 				return nil
 			}
 			return err
 		}
 
-		if strings.HasPrefix(chosen, sectionPrefix) {
-			// User selected a header — re-show the menu.
+		if category == actionExit {
+			return nil
+		}
+
+		// Step 2: pick command within category.
+		var names []string
+		var title string
+		switch category {
+		case categoryInfra:
+			names = infraCommands
+			title = "Infra — which command?"
+		default:
+			names = rulesetCommands
+			title = "Rulesets — which command?"
+		}
+
+		cmdStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Bold(true)
+		descStyle := lipgloss.NewStyle().Foreground(clrDesc)
+
+		var options []huh.Option[string]
+		for _, name := range names {
+			sub, ok := cmdMap[name]
+			if !ok {
+				continue
+			}
+			label := "  " + cmdStyle.Render(fmt.Sprintf("%-12s", sub.Name())) + " " + descStyle.Render(sub.Short)
+			options = append(options, huh.NewOption(label, sub.Name()))
+		}
+		options = append(options, huh.NewOption(mutedStyle.Render("  ← Back"), actionBack))
+
+		var chosen string
+		cmdForm := huh.NewForm(
+			huh.NewGroup(
+				huh.NewSelect[string]().
+					Title(title).
+					Options(options...).
+					Value(&chosen),
+			),
+		).WithTheme(theme)
+
+		if err := cmdForm.Run(); err != nil {
+			if errors.Is(err, huh.ErrUserAborted) {
+				// ESC on step 2 → back to category menu
+				continue
+			}
+			return err
+		}
+
+		if chosen == actionBack {
 			continue
 		}
 
