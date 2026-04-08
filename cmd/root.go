@@ -89,7 +89,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&globals.Registry, "registry", "", "Registry base URL")
 	rootCmd.PersistentFlags().StringVar(&globals.Workspace, "workspace", "", "Workspace (default: \"default\")")
 	rootCmd.PersistentFlags().StringVar(&globals.Dir, "dir", "", "Local output directory (default: .rulekit)")
-	rootCmd.PersistentFlags().StringVar(&globals.Token, "token", "", "Bearer token")
+	rootCmd.PersistentFlags().StringVar(&globals.APIKey, "apikey", "", "API key for registry authentication")
 	rootCmd.PersistentFlags().BoolVar(&globals.Verbose, "verbose", false, "Enable structured logging")
 
 	rootCmd.AddGroup(
@@ -167,8 +167,59 @@ func runInteractive(root *cobra.Command) error {
 			return fmt.Errorf("unknown command: %s", chosen)
 		}
 
-		return sub.RunE(sub, []string{})
+		args, err := promptArgs(sub)
+		if err != nil {
+			if errors.Is(err, huh.ErrUserAborted) {
+				return nil
+			}
+			return err
+		}
+
+		return sub.RunE(sub, args)
 	}
+}
+
+// promptArgs prompts for any required positional arguments for commands that need them.
+func promptArgs(cmd *cobra.Command) ([]string, error) {
+	// Detect commands with required positional args from their Use string.
+	// e.g. "add <key>" → prompt for "key"
+	argNames := parseRequiredArgs(cmd.Use)
+	if len(argNames) == 0 {
+		return []string{}, nil
+	}
+
+	args := make([]string, len(argNames))
+	fields := make([]huh.Field, len(argNames))
+	for i, name := range argNames {
+		i, name := i, name
+		fields[i] = huh.NewInput().
+			Title(name).
+			Value(&args[i]).
+			Validate(func(s string) error {
+				if s == "" {
+					return fmt.Errorf("%s is required", name)
+				}
+				return nil
+			})
+	}
+
+	form := huh.NewForm(huh.NewGroup(fields...)).WithTheme(interactiveTheme())
+	if err := form.Run(); err != nil {
+		return nil, err
+	}
+	return args, nil
+}
+
+// parseRequiredArgs extracts <arg> names from a cobra Use string.
+// e.g. "add <key>" → ["key"], "pull" → []
+func parseRequiredArgs(use string) []string {
+	var args []string
+	for _, part := range strings.Fields(use) {
+		if strings.HasPrefix(part, "<") && strings.HasSuffix(part, ">") {
+			args = append(args, strings.Trim(part, "<>"))
+		}
+	}
+	return args
 }
 
 func buildHelp(_ *cobra.Command) string {

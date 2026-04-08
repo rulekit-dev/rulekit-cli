@@ -11,14 +11,17 @@ import (
 )
 
 var removeCmd = &cobra.Command{
-	Use:   "remove <key>",
-	Short: "Remove a ruleset from the lockfile and delete local files",
+	Use:     "remove <key>",
+	Short:   "Remove a ruleset from the lockfile and delete local files",
 	GroupID: "ruleset",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runRemove,
+	RunE:    runRemove,
 }
 
 func runRemove(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		output.Error("usage: rulekit remove <key>")
+		return globals.Exitf(1, "missing required argument: key")
+	}
 	key := args[0]
 
 	lf, err := lock.Read(globals.LockfilePath)

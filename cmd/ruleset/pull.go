@@ -41,11 +41,14 @@ func runPull(cmd *cobra.Command, args []string) error {
 		return globals.Exitf(1, "%v", err)
 	}
 
-	cfg := config.Resolve(globals.Registry, globals.Workspace, globals.Dir, globals.Token, lf.Registry, lf.Workspace)
+	cfg, err := config.ResolveInteractive(globals.Registry, globals.Workspace, globals.Dir, globals.APIKey, lf.Registry, lf.Workspace)
+	if err != nil {
+		return err
+	}
 	lf.Registry = cfg.RegistryURL
 	lf.Workspace = cfg.Workspace
 
-	client := registry.NewClient(cfg.RegistryURL, cfg.Token)
+	client := registry.NewClient(cfg.RegistryURL, cfg.APIKey)
 
 	var keys []string
 	if pullKey != "" {

@@ -16,8 +16,8 @@ func TestResolve_Defaults(t *testing.T) {
 	if cfg.Dir != ".rulekit" {
 		t.Errorf("expected default dir, got %q", cfg.Dir)
 	}
-	if cfg.Token != "" {
-		t.Errorf("expected empty token, got %q", cfg.Token)
+	if cfg.APIKey != "" {
+		t.Errorf("expected empty api key, got %q", cfg.APIKey)
 	}
 }
 
@@ -25,7 +25,7 @@ func TestResolve_LockfileOverridesDefaults(t *testing.T) {
 	t.Setenv("RULEKIT_REGISTRY_URL", "")
 	t.Setenv("RULEKIT_WORKSPACE", "")
 	t.Setenv("RULEKIT_DIR", "")
-	t.Setenv("RULEKIT_TOKEN", "")
+	t.Setenv("RULEKIT_API_KEY", "")
 	cfg := Resolve("", "", "", "", "http://registry.example.com", "production")
 
 	if cfg.RegistryURL != "http://registry.example.com" {
@@ -40,7 +40,7 @@ func TestResolve_EnvOverridesLockfile(t *testing.T) {
 	t.Setenv("RULEKIT_REGISTRY_URL", "http://env.example.com")
 	t.Setenv("RULEKIT_WORKSPACE", "staging")
 	t.Setenv("RULEKIT_DIR", "/tmp/rules")
-	t.Setenv("RULEKIT_TOKEN", "env-token")
+	t.Setenv("RULEKIT_API_KEY", "env-apikey")
 
 	cfg := Resolve("", "", "", "", "http://lock.example.com", "production")
 
@@ -53,17 +53,17 @@ func TestResolve_EnvOverridesLockfile(t *testing.T) {
 	if cfg.Dir != "/tmp/rules" {
 		t.Errorf("expected env dir, got %q", cfg.Dir)
 	}
-	if cfg.Token != "env-token" {
-		t.Errorf("expected env token, got %q", cfg.Token)
+	if cfg.APIKey != "env-apikey" {
+		t.Errorf("expected env api key, got %q", cfg.APIKey)
 	}
 }
 
 func TestResolve_FlagsOverrideEnv(t *testing.T) {
 	t.Setenv("RULEKIT_REGISTRY_URL", "http://env.example.com")
 	t.Setenv("RULEKIT_WORKSPACE", "staging")
-	t.Setenv("RULEKIT_TOKEN", "env-token")
+	t.Setenv("RULEKIT_API_KEY", "env-apikey")
 
-	cfg := Resolve("http://flag.example.com", "flag-ws", "flag-dir", "flag-token", "", "")
+	cfg := Resolve("http://flag.example.com", "flag-ws", "flag-dir", "flag-apikey", "", "")
 
 	if cfg.RegistryURL != "http://flag.example.com" {
 		t.Errorf("expected flag registry URL, got %q", cfg.RegistryURL)
@@ -74,8 +74,8 @@ func TestResolve_FlagsOverrideEnv(t *testing.T) {
 	if cfg.Dir != "flag-dir" {
 		t.Errorf("expected flag dir, got %q", cfg.Dir)
 	}
-	if cfg.Token != "flag-token" {
-		t.Errorf("expected flag token, got %q", cfg.Token)
+	if cfg.APIKey != "flag-apikey" {
+		t.Errorf("expected flag api key, got %q", cfg.APIKey)
 	}
 }
 

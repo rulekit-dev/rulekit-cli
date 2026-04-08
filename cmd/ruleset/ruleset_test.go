@@ -59,7 +59,7 @@ func setupTempDir(t *testing.T) string {
 	t.Setenv("RULEKIT_DIR", filepath.Join(dir, ".rulekit"))
 	t.Setenv("RULEKIT_REGISTRY_URL", "")
 	t.Setenv("RULEKIT_WORKSPACE", "")
-	t.Setenv("RULEKIT_TOKEN", "")
+	t.Setenv("RULEKIT_API_KEY", "")
 	t.Cleanup(func() { globals.LockfilePath = "rulekit.lock" })
 	return dir
 }
@@ -68,7 +68,7 @@ func resetFlags() {
 	globals.Registry = ""
 	globals.Workspace = ""
 	globals.Dir = ""
-	globals.Token = ""
+	globals.APIKey = ""
 	globals.Verbose = false
 	pullKey = ""
 	pullVersion = ""

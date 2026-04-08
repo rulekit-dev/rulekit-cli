@@ -112,8 +112,11 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		fmt.Println(output.Label("  Rulesets"))
 		fmt.Println()
 
-		cfg := config.Resolve(globals.Registry, globals.Workspace, globals.Dir, globals.Token, lf.Registry, lf.Workspace)
-		regClient := registry.NewClient(cfg.RegistryURL, cfg.Token)
+		cfg, err := config.ResolveInteractive(globals.Registry, globals.Workspace, globals.Dir, globals.APIKey, lf.Registry, lf.Workspace)
+		if err != nil {
+			return err
+		}
+		regClient := registry.NewClient(cfg.RegistryURL, cfg.APIKey)
 
 		w2 := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
 		for key, entry := range lf.Rulesets {

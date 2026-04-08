@@ -7,7 +7,7 @@ var (
 	Registry  string
 	Workspace string
 	Dir       string
-	Token     string
+	APIKey    string
 	Verbose   bool
 
 	// LockfilePath is the path to rulekit.lock, overridable in tests.
