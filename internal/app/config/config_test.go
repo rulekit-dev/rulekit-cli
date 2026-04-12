@@ -4,7 +4,18 @@ import (
 	"testing"
 )
 
+// isolateHome points HOME at an empty temp dir so userconfig.Load finds no file.
+func isolateHome(t *testing.T) {
+	t.Helper()
+	t.Setenv("HOME", t.TempDir())
+}
+
 func TestResolve_Defaults(t *testing.T) {
+	isolateHome(t)
+	t.Setenv("RULEKIT_REGISTRY_URL", "")
+	t.Setenv("RULEKIT_WORKSPACE", "")
+	t.Setenv("RULEKIT_DIR", "")
+	t.Setenv("RULEKIT_API_KEY", "")
 	cfg := Resolve("", "", "", "", "", "")
 
 	if cfg.RegistryURL != "http://localhost:8080" {
@@ -22,6 +33,7 @@ func TestResolve_Defaults(t *testing.T) {
 }
 
 func TestResolve_LockfileOverridesDefaults(t *testing.T) {
+	isolateHome(t)
 	t.Setenv("RULEKIT_REGISTRY_URL", "")
 	t.Setenv("RULEKIT_WORKSPACE", "")
 	t.Setenv("RULEKIT_DIR", "")
